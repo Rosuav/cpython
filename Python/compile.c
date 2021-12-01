@@ -2404,7 +2404,7 @@ compiler_default_arguments(struct compiler *c, arguments_ty args)
 }
 
 static int
-compiler_default_arg_expression(struct compiler *c, int local, default_ty dflt)
+compiler_default_arg_expression(struct compiler *c, Py_ssize_t local, default_ty dflt)
 {
     if (!dflt || dflt->type != DfltExpr) return 1;
     basicblock *end = compiler_new_block(c);
@@ -2422,7 +2422,7 @@ compiler_default_arg_expression(struct compiler *c, int local, default_ty dflt)
 static int
 compiler_default_arg_expressions(struct compiler *c, arguments_ty args)
 {
-    int i;
+    Py_ssize_t i;
     Py_ssize_t argcount = asdl_seq_LEN(args->posonlyargs) + asdl_seq_LEN(args->args);
     if (args->defaults && asdl_seq_LEN(args->defaults) > 0) {
         Py_ssize_t mandatory = argcount - asdl_seq_LEN(args->defaults);
