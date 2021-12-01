@@ -105,10 +105,10 @@ extern "C" {
 #define CONTAINS_OP             118
 #define RERAISE                 119
 #define JUMP_IF_NOT_EXC_MATCH   121
-#define QUERY_FAST              123
 #define LOAD_FAST               124
 #define STORE_FAST              125
 #define DELETE_FAST             126
+#define QUERY_FAST              127
 #define GEN_START               129
 #define RAISE_VARARGS           130
 #define CALL_FUNCTION           131
@@ -119,6 +119,7 @@ extern "C" {
 #define LOAD_DEREF              137
 #define STORE_DEREF             138
 #define DELETE_DEREF            139
+#define QUERY_DEREF             140
 #define CALL_FUNCTION_KW        141
 #define CALL_FUNCTION_EX        142
 #define EXTENDED_ARG            144
@@ -162,22 +163,22 @@ extern "C" {
 #define LOAD_ATTR_SLOT           88
 #define LOAD_ATTR_MODULE        120
 #define LOAD_GLOBAL_ADAPTIVE    122
-#define LOAD_GLOBAL_MODULE      127
+#define LOAD_GLOBAL_MODULE      123
 #define LOAD_GLOBAL_BUILTIN     128
 #define LOAD_METHOD_ADAPTIVE    134
-#define LOAD_METHOD_CACHED      140
-#define LOAD_METHOD_CLASS       143
-#define LOAD_METHOD_MODULE      149
-#define LOAD_METHOD_NO_DICT     150
-#define STORE_ATTR_ADAPTIVE     151
-#define STORE_ATTR_INSTANCE_VALUE 153
-#define STORE_ATTR_SLOT         154
-#define STORE_ATTR_WITH_HINT    158
-#define LOAD_FAST__LOAD_FAST    159
-#define STORE_FAST__LOAD_FAST   167
-#define LOAD_FAST__LOAD_CONST   168
-#define LOAD_CONST__LOAD_FAST   169
-#define STORE_FAST__STORE_FAST  170
+#define LOAD_METHOD_CACHED      143
+#define LOAD_METHOD_CLASS       149
+#define LOAD_METHOD_MODULE      150
+#define LOAD_METHOD_NO_DICT     151
+#define STORE_ATTR_ADAPTIVE     153
+#define STORE_ATTR_INSTANCE_VALUE 154
+#define STORE_ATTR_SLOT         158
+#define STORE_ATTR_WITH_HINT    159
+#define LOAD_FAST__LOAD_FAST    167
+#define STORE_FAST__LOAD_FAST   168
+#define LOAD_FAST__LOAD_CONST   169
+#define LOAD_CONST__LOAD_FAST   170
+#define STORE_FAST__STORE_FAST  171
 #define DO_TRACING              255
 #ifdef NEED_OPCODE_JUMP_TABLES
 static uint32_t _PyOpcode_RelativeJump[8] = {

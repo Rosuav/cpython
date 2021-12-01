@@ -3373,6 +3373,18 @@ check_eval_breaker:
             DISPATCH();
         }
 
+        TARGET(QUERY_DEREF) {
+            PyObject *cell = GETLOCAL(oparg);
+            PyObject *value = PyCell_GET(cell);
+            if (value == NULL)
+                value = Py_False;
+            else
+                value = Py_True;
+            Py_INCREF(value);
+            PUSH(value);
+            DISPATCH();
+        }
+
         TARGET(BUILD_STRING) {
             PyObject *str;
             PyObject *empty = PyUnicode_New(0, 0);

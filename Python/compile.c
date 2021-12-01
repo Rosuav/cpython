@@ -1217,6 +1217,8 @@ stack_effect(int opcode, int oparg, int jump)
             return -1;
         case DELETE_DEREF:
             return 0;
+        case QUERY_DEREF:
+            return 1;
 
         /* Iterators and generators */
         case GET_AWAITABLE:
@@ -2410,11 +2412,17 @@ compiler_default_arg_expression(struct compiler *c, Py_ssize_t local, default_ty
     basicblock *end = compiler_new_block(c);
     if (end == NULL)
         return 0;
-    ADDOP_I(c, QUERY_FAST, local);
+
+    //How do you figure out whether a given local (by index) is a cell var?
+    //This seems an inefficient technique: get the name, query the name.
+    PyObject *name = PyList_GET_ITEM(c->u->u_ste->ste_varnames, local);
+    int fast = _PyST_GetScope(c->u->u_ste, name) == LOCAL;
+
+    ADDOP_I(c, fast ? QUERY_FAST : QUERY_DEREF, local);
     ADDOP_JUMP(c, POP_JUMP_IF_TRUE, end);
     NEXT_BLOCK(c);
     VISIT(c, expr, dflt->value);
-    ADDOP_I(c, STORE_FAST, local);
+    ADDOP_I(c, fast ? STORE_FAST : STORE_DEREF, local);
     compiler_use_next_block(c, end);
     return 1;
 }

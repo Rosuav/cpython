@@ -1128,6 +1128,14 @@ All of the following opcodes use their arguments.
       ``i`` is no longer offset by the length of ``co_varnames``.
 
 
+.. opcode:: QUERY_DEREF (var_num)
+
+   Tests whether  the cell contained in slot ``i`` of the "fast locals" storage
+   has a value, and pushes True if it does and False if it does not.
+   Consequently, if ``QUERY_DEREF`` pushes ``False``, ``LOAD_DEREF`` would
+   raise ``UnboundLocalError``.
+
+
 .. opcode:: RAISE_VARARGS (argc)
 
    Raises an exception using one of the 3 forms of the ``raise`` statement,
