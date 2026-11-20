@@ -381,7 +381,10 @@ param[arg_ty]: a=NAME b=annotation? { _PyAST_arg(a->v.Name.id, b, NULL, EXTRA) }
 param_star_annotation[arg_ty]: a=NAME b=star_annotation { _PyAST_arg(a->v.Name.id, b, NULL, EXTRA) }
 annotation[expr_ty]: ':' a=expression { a }
 star_annotation[expr_ty]: ':' a=star_expression { a }
-default[expr_ty]: '=' a=expression { a } | invalid_default
+default[default_ty]:
+    | '=' a=expression { _PyPegen_arg_default(p, a, DfltValue) }
+    | '=' '>' a=expression { _PyPegen_arg_default(p, a, DfltExpr) }
+    | invalid_default
 
 # If statement
 # ------------

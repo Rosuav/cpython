@@ -697,7 +697,7 @@ static arg_ty param_no_default_star_annotation_rule(Parser *p);
 static arg_ty param_star_annotation_rule(Parser *p);
 static expr_ty annotation_rule(Parser *p);
 static expr_ty star_annotation_rule(Parser *p);
-static expr_ty default_rule(Parser *p);
+static default_ty default_rule(Parser *p);
 static stmt_ty if_stmt_rule(Parser *p);
 static stmt_ty elif_stmt_rule(Parser *p);
 static asdl_stmt_seq* else_block_rule(Parser *p);
@@ -5654,7 +5654,7 @@ param_with_default_rule(Parser *p)
         D(fprintf(stderr, "%*c> param_with_default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "param default ',' TYPE_COMMENT?"));
         Token * _literal;
         arg_ty a;
-        expr_ty c;
+        default_ty c;
         void *tc;
         if (
             (a = param_rule(p))  // param
@@ -5686,7 +5686,7 @@ param_with_default_rule(Parser *p)
         }
         D(fprintf(stderr, "%*c> param_with_default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "param default TYPE_COMMENT? &')'"));
         arg_ty a;
-        expr_ty c;
+        default_ty c;
         void *tc;
         if (
             (a = param_rule(p))  // param
@@ -6023,8 +6023,8 @@ star_annotation_rule(Parser *p)
     return _res;
 }
 
-// default: '=' expression | invalid_default
-static expr_ty
+// default: '=' expression | '=' '>' expression | invalid_default
+static default_ty
 default_rule(Parser *p)
 {
     if (p->level++ == MAXSTACK || _PyPegen_stack_exhausted(p)) {
@@ -6034,7 +6034,7 @@ default_rule(Parser *p)
         p->level--;
         return NULL;
     }
-    expr_ty _res = NULL;
+    default_ty _res = NULL;
     int _mark = p->mark;
     { // '=' expression
         if (p->error_indicator) {
@@ -6051,7 +6051,7 @@ default_rule(Parser *p)
         )
         {
             D(fprintf(stderr, "%*c+ default[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'=' expression"));
-            _res = a;
+            _res = _PyPegen_arg_default ( p , a , DfltValue );
             if ((_res == NULL || p->error_indicator) && PyErr_Occurred()) {
                 p->error_indicator = 1;
                 p->level--;
@@ -6062,6 +6062,36 @@ default_rule(Parser *p)
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s default[%d-%d]: %s failed!\n", p->level, ' ',
                   p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'=' expression"));
+    }
+    { // '=' '>' expression
+        if (p->error_indicator) {
+            p->level--;
+            return NULL;
+        }
+        D(fprintf(stderr, "%*c> default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'=' '>' expression"));
+        Token * _literal;
+        Token * _literal_1;
+        expr_ty a;
+        if (
+            (_literal = _PyPegen_expect_token(p, 22))  // token='='
+            &&
+            (_literal_1 = _PyPegen_expect_token(p, 21))  // token='>'
+            &&
+            (a = expression_rule(p))  // expression
+        )
+        {
+            D(fprintf(stderr, "%*c+ default[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'=' '>' expression"));
+            _res = _PyPegen_arg_default ( p , a , DfltExpr );
+            if ((_res == NULL || p->error_indicator) && PyErr_Occurred()) {
+                p->error_indicator = 1;
+                p->level--;
+                return NULL;
+            }
+            goto done;
+        }
+        p->mark = _mark;
+        D(fprintf(stderr, "%*c%s default[%d-%d]: %s failed!\n", p->level, ' ',
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'=' '>' expression"));
     }
     if (p->call_invalid_rules) { // invalid_default
         if (p->error_indicator) {
@@ -16047,7 +16077,7 @@ lambda_param_with_default_rule(Parser *p)
         D(fprintf(stderr, "%*c> lambda_param_with_default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "lambda_param default ','"));
         Token * _literal;
         arg_ty a;
-        expr_ty c;
+        default_ty c;
         if (
             (a = lambda_param_rule(p))  // lambda_param
             &&
@@ -16076,7 +16106,7 @@ lambda_param_with_default_rule(Parser *p)
         }
         D(fprintf(stderr, "%*c> lambda_param_with_default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "lambda_param default &':'"));
         arg_ty a;
-        expr_ty c;
+        default_ty c;
         if (
             (a = lambda_param_rule(p))  // lambda_param
             &&

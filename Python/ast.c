@@ -125,6 +125,32 @@ expr_context_name(expr_context_ty ctx)
 }
 
 static int
+validate_defaults(asdl_default_seq *exprs, int null_ok)
+{
+    Py_ssize_t i;
+    assert(!PyErr_Occurred());
+    for (i = 0; i < asdl_seq_LEN(exprs); i++) {
+        default_ty dflt = asdl_seq_GET(exprs, i);
+        if (dflt) {
+            if (dflt->type != DfltValue && dflt->type != DfltExpr) {
+                PyErr_SetString(PyExc_ValueError,
+                                "Invalid default type");
+                return 0;
+            }
+            if (!validate_expr(dflt->value, Load))
+                return 0;
+        }
+        else if (!null_ok) {
+            PyErr_SetString(PyExc_ValueError,
+                            "None disallowed in expression list");
+            return 0;
+        }
+
+    }
+    return 1;
+}
+
+static int
 validate_arguments(arguments_ty args)
 {
     assert(!PyErr_Occurred());
@@ -150,7 +176,7 @@ validate_arguments(arguments_ty args)
                         "kw_defaults on arguments");
         return 0;
     }
-    return validate_exprs(args->defaults, Load, 0) && validate_exprs(args->kw_defaults, Load, 1);
+    return validate_defaults(args->defaults, 0) && validate_defaults(args->kw_defaults, 1);
 }
 
 static int

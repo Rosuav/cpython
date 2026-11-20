@@ -1264,7 +1264,7 @@ def getargs(co):
 
 
 FullArgSpec = namedtuple('FullArgSpec',
-    'args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations')
+    'args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations, defaults_extra, kwonlydefaults_extra')
 
 def getfullargspec(func, *, annotation_format=Format.VALUE):
     """Get the names and default values of a callable object's parameters.
@@ -1276,6 +1276,8 @@ def getfullargspec(func, *, annotation_format=Format.VALUE):
     'kwonlyargs' is a list of keyword-only parameter names.
     'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
     'annotations' is a dictionary mapping parameter names to annotations.
+    'defaults_extra' is None or an n-tuple indicating which defaults are late-bound.
+    'kwonlydefaults_extra' maps names to whether their defaults are late-bound.
 
     The *annotation_format* parameter controls the format of the annotations.
     See the annotationlib documentation for details.
@@ -1322,6 +1324,8 @@ def getfullargspec(func, *, annotation_format=Format.VALUE):
     annotations = {}
     defaults = ()
     kwdefaults = {}
+    defaults_extra = ()
+    kwdefaults_extra = {}
 
     if sig.return_annotation is not sig.empty:
         annotations['return'] = sig.return_annotation
@@ -1333,16 +1337,25 @@ def getfullargspec(func, *, annotation_format=Format.VALUE):
         if kind is _POSITIONAL_ONLY:
             posonlyargs.append(name)
             if param.default is not param.empty:
+                if param.extra is not None:
+                    # Extend the extra tuple far enough to add this in the right place
+                    defaults_extra += ((None,) * (len(defaults) - len(defaults_extra))
+                        + (param.extra,))
                 defaults += (param.default,)
         elif kind is _POSITIONAL_OR_KEYWORD:
             args.append(name)
             if param.default is not param.empty:
+                if param.extra is not None:
+                    defaults_extra += ((None,) * (len(defaults) - len(defaults_extra))
+                        + (param.extra,))
                 defaults += (param.default,)
         elif kind is _VAR_POSITIONAL:
             varargs = name
         elif kind is _KEYWORD_ONLY:
             kwonlyargs.append(name)
             if param.default is not param.empty:
+                if param.extra is not None:
+                    kwdefaults_extra[name] = param.extra
                 kwdefaults[name] = param.default
         elif kind is _VAR_KEYWORD:
             varkw = name
@@ -1358,8 +1371,15 @@ def getfullargspec(func, *, annotation_format=Format.VALUE):
         # compatibility with 'func.__defaults__'
         defaults = None
 
+    if not kwdefaults_extra:
+        kwdefaults_extra = None
+
+    if not defaults_extra:
+        defaults_extra = None
+
     return FullArgSpec(posonlyargs + args, varargs, varkw, defaults,
-                       kwonlyargs, kwdefaults, annotations)
+                       kwonlyargs, kwdefaults, annotations,
+                       defaults_extra, kwdefaults_extra)
 
 
 ArgInfo = namedtuple('ArgInfo', 'args varargs keywords locals')
@@ -1479,7 +1499,7 @@ def getcallargs(func, /, *positional, **named):
     names of the * and ** arguments, if any), and values the respective bound
     values from 'positional' and 'named'."""
     spec = getfullargspec(func)
-    args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, ann = spec
+    args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, ann, defaults_extra, kwonlydefaults_extra = spec
     f_name = func.__name__
     arg2value = {}
 
@@ -1521,11 +1541,14 @@ def getcallargs(func, /, *positional, **named):
         for i, arg in enumerate(args[num_args - num_defaults:]):
             if arg not in arg2value:
                 arg2value[arg] = defaults[i]
+                # NOTE: Late-bound defaults cannot be represented directly as
+                # they are calculated dynamically. They will have Ellipsis.
     missing = 0
     for kwarg in kwonlyargs:
         if kwarg not in arg2value:
             if kwonlydefaults and kwarg in kwonlydefaults:
                 arg2value[kwarg] = kwonlydefaults[kwarg]
+                # As above.
             else:
                 missing += 1
     if missing:
@@ -2272,13 +2295,18 @@ def _signature_fromstr(cls, obj, s, skip_bound_arg=True):
 
     def p(name_node, default_node, default=empty):
         name = parse_name(name_node)
+        extra = None
         if default_node and default_node is not _empty:
             try:
-                default_node = RewriteSymbolics().visit(default_node)
-                default = ast.literal_eval(default_node)
+                value = RewriteSymbolics().visit(default_node.value)
+                if default_node.type is ast.DfltExpr:
+                    extra = ast.unparse(value)
+                    o = ...
+                else:
+                    o = ast.literal_eval(value)
             except ValueError:
                 raise ValueError("{!r} builtin has invalid signature".format(obj)) from None
-        parameters.append(Parameter(name, kind, default=default, annotation=empty))
+        parameters.append(Parameter(name, kind, default=default, extra=extra, annotation=empty))
 
     # non-keyword-only parameters
     total_non_kw_args = len(f.args.posonlyargs) + len(f.args.args)
@@ -2378,9 +2406,15 @@ def _signature_from_function(cls, func, skip_bound_arg=True,
                                   format=annotation_format)
     defaults = func.__defaults__
     kwdefaults = func.__kwdefaults__
+    defaults_extra = getattr(func, "__defaults_extra__", None)
+    kwdefaults_extra = getattr(func, "__kwdefaults_extra__", None)
 
     if defaults:
         pos_default_count = len(defaults)
+        if not defaults_extra: defaults_extra = ()
+        if len(defaults_extra) < pos_default_count:
+            # Extend the defaults_extra tuple to full length
+            defaults_extra += (None,) * (pos_default_count - len(defaults_extra))
     else:
         pos_default_count = 0
 
@@ -2404,7 +2438,8 @@ def _signature_from_function(cls, func, skip_bound_arg=True,
         annotation = annotations.get(name, _empty)
         parameters.append(Parameter(name, annotation=annotation,
                                     kind=kind,
-                                    default=defaults[offset]))
+                                    default=defaults[offset],
+                                    extra=defaults_extra[offset]))
         if posonly_left:
             posonly_left -= 1
 
@@ -2420,11 +2455,15 @@ def _signature_from_function(cls, func, skip_bound_arg=True,
         default = _empty
         if kwdefaults is not None:
             default = kwdefaults.get(name, _empty)
+        extra = None
+        if kwdefaults_extra is not None:
+            extra = kwdefaults_extra.get(name, None)
 
         annotation = annotations.get(name, _empty)
         parameters.append(Parameter(name, annotation=annotation,
                                     kind=_KEYWORD_ONLY,
-                                    default=default))
+                                    default=default,
+                                    extra=extra))
     # **kwargs
     if func_code.co_flags & CO_VARKEYWORDS:
         index = pos_count + keyword_only_count
@@ -2698,6 +2737,10 @@ class Parameter:
         The default value for the parameter if specified.  If the
         parameter has no default value, this attribute is set to
         `Parameter.empty`.
+    * extra : str | None
+        For late-bound defaults, the default is Ellipsis and a
+        source code description of it is in extra; for early-bound
+        defaults, the extra is None.
     * annotation
         The annotation for the parameter if specified.  If the
         parameter has no annotation, this attribute is set to
@@ -2710,7 +2753,7 @@ class Parameter:
         Every value has a `description` attribute describing meaning.
     """
 
-    __slots__ = ('_name', '_kind', '_default', '_annotation')
+    __slots__ = ('_name', '_kind', '_default', '_annotation', '_extra')
 
     POSITIONAL_ONLY         = _POSITIONAL_ONLY
     POSITIONAL_OR_KEYWORD   = _POSITIONAL_OR_KEYWORD
@@ -2720,7 +2763,7 @@ class Parameter:
 
     empty = _empty
 
-    def __init__(self, name, kind, *, default=_empty, annotation=_empty):
+    def __init__(self, name, kind, *, default=_empty, extra=_empty, annotation=_empty):
         try:
             self._kind = _ParameterKind(kind)
         except ValueError:
@@ -2731,6 +2774,8 @@ class Parameter:
                 msg = msg.format(self._kind.description)
                 raise ValueError(msg)
         self._default = default
+        if extra is _empty: extra = None
+        self._extra = extra
         self._annotation = annotation
 
         if name is _empty:
@@ -2779,10 +2824,12 @@ class Parameter:
         return (type(self),
                 (self._name, self._kind),
                 {'_default': self._default,
+                 '_extra': self._extra,
                  '_annotation': self._annotation})
 
     def __setstate__(self, state):
         self._default = state['_default']
+        self._extra = state['_extra']
         self._annotation = state['_annotation']
 
     @property
@@ -2794,6 +2841,10 @@ class Parameter:
         return self._default
 
     @property
+    def extra(self):
+        return self._extra
+
+    @property
     def annotation(self):
         return self._annotation
 
@@ -2802,7 +2853,7 @@ class Parameter:
         return self._kind
 
     def replace(self, *, name=_void, kind=_void,
-                annotation=_void, default=_void):
+                annotation=_void, default=_void, extra=_void):
         """Creates a customized copy of the Parameter."""
 
         if name is _void:
@@ -2817,6 +2868,9 @@ class Parameter:
         if default is _void:
             default = self._default
 
+        if extra is _void:
+            extra = self._extra
+
         return type(self)(name, kind, default=default, annotation=annotation)
 
     def __str__(self):
@@ -2825,18 +2879,20 @@ class Parameter:
     def _format(self, *, quote_annotation_strings=True):
         kind = self.kind
         formatted = self._name
+        sep = ''
 
         # Add annotation and default value
         if self._annotation is not _empty:
+            sep = ' '
             annotation = formatannotation(self._annotation,
                                           quote_annotation_strings=quote_annotation_strings)
             formatted = '{}: {}'.format(formatted, annotation)
 
         if self._default is not _empty:
-            if self._annotation is not _empty:
-                formatted = '{} = {}'.format(formatted, repr(self._default))
+            if self._default is ... and self._extra is not None:
+                formatted = sep.join([formatted, '=>', str(self._extra)])
             else:
-                formatted = '{}={}'.format(formatted, repr(self._default))
+                formatted = sep.join([formatted, '=', repr(self._default)])
 
         if kind == _VAR_POSITIONAL:
             formatted = '*' + formatted
@@ -2851,7 +2907,7 @@ class Parameter:
         return '<{} "{}">'.format(self.__class__.__name__, self)
 
     def __hash__(self):
-        return hash((self._name, self._kind, self._annotation, self._default))
+        return hash((self._name, self._kind, self._annotation, self._default, self._extra))
 
     def __eq__(self, other):
         if self is other:
@@ -2861,6 +2917,7 @@ class Parameter:
         return (self._name == other._name and
                 self._kind == other._kind and
                 self._default == other._default and
+                self._extra == other._extra and
                 self._annotation == other._annotation)
 
 
@@ -2960,7 +3017,10 @@ class BoundArguments:
                 new_arguments.append((name, arguments[name]))
             except KeyError:
                 if param.default is not _empty:
-                    val = param.default
+                    if param.default is ... and param.extra is not None:
+                        continue # Late-bound default, omit it
+                    else:
+                        val = param.default
                 elif param.kind is _VAR_POSITIONAL:
                     val = ()
                 elif param.kind is _VAR_KEYWORD:

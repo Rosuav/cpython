@@ -136,6 +136,8 @@ _PyFunction_FromConstructor(PyFrameConstructor *constr)
     op->func_code = constr->fc_code;
     op->func_defaults = Py_XNewRef(constr->fc_defaults);
     op->func_kwdefaults = Py_XNewRef(constr->fc_kwdefaults);
+    op->func_defaults_extra = Py_XNewRef(constr->fc_defaults_extra);
+    op->func_kwdefaults_extra = Py_XNewRef(constr->fc_kwdefaults_extra);
     op->func_closure = Py_XNewRef(constr->fc_closure);
     op->func_doc = Py_NewRef(Py_None);
     op->func_dict = NULL;
@@ -213,7 +215,9 @@ PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject *qualname
     op->func_qualname = qualname;
     op->func_code = (PyObject*)code_obj;
     op->func_defaults = NULL;    // No default positional arguments
+    op->func_defaults_extra = NULL;
     op->func_kwdefaults = NULL;  // No default keyword arguments
+    op->func_kwdefaults_extra = NULL;
     op->func_closure = NULL;
     op->func_doc = doc;
     op->func_dict = NULL;
@@ -447,6 +451,45 @@ PyFunction_SetDefaults(PyObject *op, PyObject *defaults)
     return 0;
 }
 
+PyObject *
+PyFunction_GetDefaultsExtra(PyObject *op)
+{
+    if (!PyFunction_Check(op)) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+    return ((PyFunctionObject *) op) -> func_defaults_extra;
+}
+
+int
+PyFunction_SetDefaultsExtra(PyObject *op, PyObject *defaults)
+{
+    if (!PyFunction_Check(op)) {
+        PyErr_BadInternalCall();
+        return -1;
+    }
+    if (defaults == Py_None)
+        defaults = NULL;
+    else if (defaults && PyTuple_Check(defaults)) {
+        Py_INCREF(defaults);
+    }
+    else {
+        PyErr_SetString(PyExc_SystemError, "non-tuple default args");
+        return -1;
+    }
+    PyFunctionObject *func = (PyFunctionObject *)op;
+    /* FIXME: Does this need to be a different event? Or a flag saying that it's the defaults-extra? */
+    handle_func_event(PyFunction_EVENT_MODIFY_DEFAULTS, func, defaults);
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _PyEval_StopTheWorld(interp);
+    func_clear_version(interp, func);
+    PyObject *old_defaults = func->func_defaults_extra;
+    func->func_defaults_extra = defaults;
+    _PyEval_StartTheWorld(interp);
+    Py_XDECREF(old_defaults);
+    return 0;
+}
+
 void
 PyFunction_SetVectorcall(PyFunctionObject *func, vectorcallfunc vectorcall)
 {
@@ -492,6 +535,46 @@ PyFunction_SetKwDefaults(PyObject *op, PyObject *defaults)
     func_clear_version(interp, func);
     PyObject *old_kwdefaults = func->func_kwdefaults;
     func->func_kwdefaults = defaults;
+    _PyEval_StartTheWorld(interp);
+    Py_XDECREF(old_kwdefaults);
+    return 0;
+}
+
+PyObject *
+PyFunction_GetKwDefaultsExtra(PyObject *op)
+{
+    if (!PyFunction_Check(op)) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+    return ((PyFunctionObject *) op) -> func_kwdefaults_extra;
+}
+
+int
+PyFunction_SetKwDefaultsExtra(PyObject *op, PyObject *defaults)
+{
+    if (!PyFunction_Check(op)) {
+        PyErr_BadInternalCall();
+        return -1;
+    }
+    if (defaults == Py_None)
+        defaults = NULL;
+    else if (defaults && PyDict_Check(defaults)) {
+        Py_INCREF(defaults);
+    }
+    else {
+        PyErr_SetString(PyExc_SystemError,
+                        "non-dict keyword only default args");
+        return -1;
+    }
+    PyFunctionObject *func = (PyFunctionObject *)op;
+    /* FIXME as above: Should this be a different event? A flag on this event? */
+    handle_func_event(PyFunction_EVENT_MODIFY_KWDEFAULTS, func, defaults);
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _PyEval_StopTheWorld(interp);
+    func_clear_version(interp, func);
+    PyObject *old_kwdefaults = func->func_kwdefaults_extra;
+    func->func_kwdefaults_extra = defaults;
     _PyEval_StartTheWorld(interp);
     Py_XDECREF(old_kwdefaults);
     return 0;
@@ -932,6 +1015,103 @@ func_set_kwdefaults(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
     return 0;
 }
 
+static PyObject *
+func_get_defaults_extra(PyObject *self, void *Py_UNUSED(ignored))
+{
+    PyFunctionObject *op = _PyFunction_CAST(self);
+    if (PySys_Audit("object.__getattr__", "Os", op, "__defaults_extra__") < 0) {
+        return NULL;
+    }
+    if (op->func_defaults_extra == NULL) {
+        Py_RETURN_NONE;
+    }
+    return Py_NewRef(op->func_defaults_extra);
+}
+
+static int
+func_set_defaults_extra(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
+{
+    /* Legal to del f.func_defaults_extra.
+     * Can only set func_defaults_extra to NULL or a tuple. */
+    PyFunctionObject *op = _PyFunction_CAST(self);
+    if (value == Py_None)
+        value = NULL;
+    if (value != NULL && !PyTuple_Check(value)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "__defaults_extra__ must be set to a tuple object");
+        return -1;
+    }
+    if (value) {
+        if (PySys_Audit("object.__setattr__", "OsO",
+                        op, "__defaults_extra__", value) < 0) {
+            return -1;
+        }
+    } else if (PySys_Audit("object.__delattr__", "Os",
+                           op, "__defaults_extra__") < 0) {
+        return -1;
+    }
+
+    /* FIXME as above: Different event? Flag on event? */
+    handle_func_event(PyFunction_EVENT_MODIFY_DEFAULTS, op, value);
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _PyEval_StopTheWorld(interp);
+    func_clear_version(interp, op);
+    PyObject *old_defaults = op->func_defaults_extra;
+    op->func_defaults_extra = Py_XNewRef(value);
+    _PyEval_StartTheWorld(interp);
+    Py_XDECREF(old_defaults);
+    return 0;
+}
+
+static PyObject *
+func_get_kwdefaults_extra(PyObject *self, void *Py_UNUSED(ignored))
+{
+    PyFunctionObject *op = _PyFunction_CAST(self);
+    if (PySys_Audit("object.__getattr__", "Os",
+                    op, "__kwdefaults_extra__") < 0) {
+        return NULL;
+    }
+    if (op->func_kwdefaults_extra == NULL) {
+        Py_RETURN_NONE;
+    }
+    return Py_NewRef(op->func_kwdefaults_extra);
+}
+
+static int
+func_set_kwdefaults_extra(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
+{
+    PyFunctionObject *op = _PyFunction_CAST(self);
+    if (value == Py_None)
+        value = NULL;
+    /* Legal to del f.func_kwdefaults_extra.
+     * Can only set func_kwdefaults_extra to NULL or a dict. */
+    if (value != NULL && !PyDict_Check(value)) {
+        PyErr_SetString(PyExc_TypeError,
+            "__kwdefaults_extra__ must be set to a dict object");
+        return -1;
+    }
+    if (value) {
+        if (PySys_Audit("object.__setattr__", "OsO",
+                        op, "__kwdefaults_extra__", value) < 0) {
+            return -1;
+        }
+    } else if (PySys_Audit("object.__delattr__", "Os",
+                           op, "__kwdefaults_extra__") < 0) {
+        return -1;
+    }
+
+    /* FIXME as above: New event? Flag on event? */
+    handle_func_event(PyFunction_EVENT_MODIFY_KWDEFAULTS, op, value);
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _PyEval_StopTheWorld(interp);
+    func_clear_version(interp, op);
+    PyObject *old_kwdefaults = op->func_kwdefaults_extra;
+    op->func_kwdefaults_extra = Py_XNewRef(value);
+    _PyEval_StartTheWorld(interp);
+    Py_XDECREF(old_kwdefaults);
+    return 0;
+}
+
 /*[clinic input]
 @critical_section
 @getter
@@ -1074,6 +1254,8 @@ static PyGetSetDef func_getsetlist[] = {
     {"__code__", func_get_code, func_set_code},
     {"__defaults__", func_get_defaults, func_set_defaults},
     {"__kwdefaults__", func_get_kwdefaults, func_set_kwdefaults},
+    {"__defaults_extra__", func_get_defaults_extra, func_set_defaults_extra},
+    {"__kwdefaults_extra__", func_get_kwdefaults_extra, func_set_kwdefaults_extra},
     FUNCTION___ANNOTATIONS___GETSETDEF
     FUNCTION___ANNOTATE___GETSETDEF
     {"__dict__", PyObject_GenericGetDict, PyObject_GenericSetDict},
@@ -1264,6 +1446,8 @@ func_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(f->func_module);
     Py_VISIT(f->func_defaults);
     Py_VISIT(f->func_kwdefaults);
+    Py_VISIT(f->func_defaults_extra);
+    Py_VISIT(f->func_kwdefaults_extra);
     Py_VISIT(f->func_doc);
     Py_VISIT(f->func_name);
     Py_VISIT(f->func_dict);

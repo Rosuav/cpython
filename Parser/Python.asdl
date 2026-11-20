@@ -114,10 +114,13 @@ module Python
                     attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset)
 
     arguments = (arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs,
-                 expr?* kw_defaults, arg? kwarg, expr* defaults)
+                 default?* kw_defaults, arg? kwarg, default?* defaults)
 
     arg = (identifier arg, expr? annotation, string? type_comment)
            attributes (int lineno, int col_offset, int? end_lineno, int? end_col_offset)
+
+    dflt_style = DfltValue | DfltExpr
+    default = (expr value, dflt_style type)
 
     -- keyword arguments supplied to call (NULL identifier for **kwargs)
     keyword = (identifier? arg, expr value)

@@ -13,10 +13,12 @@ extern "C" {
     PyObject *PREFIX ## builtins; \
     PyObject *PREFIX ## name; \
     PyObject *PREFIX ## qualname; \
-    PyObject *PREFIX ## code;        /* A code object, the __code__ attribute */ \
-    PyObject *PREFIX ## defaults;    /* NULL or a tuple */ \
-    PyObject *PREFIX ## kwdefaults;  /* NULL or a dict */ \
-    PyObject *PREFIX ## closure;     /* NULL or a tuple of cell objects */
+    PyObject *PREFIX ## code;             /* A code object, the __code__ attribute */ \
+    PyObject *PREFIX ## defaults;         /* NULL or a tuple */ \
+    PyObject *PREFIX ## defaults_extra;   /* NULL or a tuple */ \
+    PyObject *PREFIX ## kwdefaults;       /* NULL or a dict */ \
+    PyObject *PREFIX ## kwdefaults_extra; /* NULL or a dict */ \
+    PyObject *PREFIX ## closure;          /* NULL or a tuple of cell objects */
 
 typedef struct {
     _Py_COMMON_FIELDS(fc_)
@@ -77,6 +79,10 @@ PyAPI_FUNC(int) PyFunction_SetDefaults(PyObject *, PyObject *);
 PyAPI_FUNC(void) PyFunction_SetVectorcall(PyFunctionObject *, vectorcallfunc);
 PyAPI_FUNC(PyObject *) PyFunction_GetKwDefaults(PyObject *);
 PyAPI_FUNC(int) PyFunction_SetKwDefaults(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) PyFunction_GetDefaultsExtra(PyObject *);
+PyAPI_FUNC(int) PyFunction_SetDefaultsExtra(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) PyFunction_GetKwDefaultsExtra(PyObject *);
+PyAPI_FUNC(int) PyFunction_SetKwDefaultsExtra(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyFunction_GetClosure(PyObject *);
 PyAPI_FUNC(int) PyFunction_SetClosure(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyFunction_GetAnnotations(PyObject *);

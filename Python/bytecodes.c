@@ -270,6 +270,12 @@ dummy_func(
             LOAD_FAST,
         };
 
+        inst(QUERY_FAST, (-- is_valid)) {
+            _PyStackRef value = GETLOCAL(oparg);
+            is_valid = PyStackRef_IsNull(value)
+                ? PyStackRef_True : PyStackRef_False;
+        }
+
         inst(LOAD_FAST_CHECK, (-- value)) {
             _PyStackRef value_s = GETLOCAL(oparg);
             if (PyStackRef_IsNull(value_s)) {
@@ -2394,6 +2400,13 @@ dummy_func(
             }
             PyStackRef_CLOSE(class_dict_st);
             value = PyStackRef_FromPyObjectSteal(value_o);
+        }
+
+        inst(QUERY_DEREF, (-- is_valid)) {
+            PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
+            PyObject *value = PyCell_GetRef(cell); /* FIXME: Is this a new or borrowed ref? */
+            is_valid = value != NULL
+                ? PyStackRef_True : PyStackRef_False;
         }
 
         inst(LOAD_DEREF, ( -- value)) {

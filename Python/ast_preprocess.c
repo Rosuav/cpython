@@ -399,6 +399,7 @@ static int astfold_arguments(arguments_ty node_, PyArena *ctx_, _PyASTPreprocess
 static int astfold_comprehension(comprehension_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
 static int astfold_keyword(keyword_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
 static int astfold_arg(arg_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
+static int astfold_default(default_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
 static int astfold_withitem(withitem_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
 static int astfold_excepthandler(excepthandler_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
 static int astfold_match_case(match_case_ty node_, PyArena *ctx_, _PyASTPreprocessState *state);
@@ -665,9 +666,9 @@ astfold_arguments(arguments_ty node_, PyArena *ctx_, _PyASTPreprocessState *stat
     CALL_SEQ(astfold_arg, arg, node_->args);
     CALL_OPT(astfold_arg, arg_ty, node_->vararg);
     CALL_SEQ(astfold_arg, arg, node_->kwonlyargs);
-    CALL_SEQ(astfold_expr, expr, node_->kw_defaults);
+    CALL_SEQ(astfold_default, default, node_->kw_defaults);
     CALL_OPT(astfold_arg, arg_ty, node_->kwarg);
-    CALL_SEQ(astfold_expr, expr, node_->defaults);
+    CALL_SEQ(astfold_default, default, node_->defaults);
     return 1;
 }
 
@@ -677,6 +678,13 @@ astfold_arg(arg_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
     if (!(state->ff_features & CO_FUTURE_ANNOTATIONS)) {
         CALL_OPT(astfold_expr, expr_ty, node_->annotation);
     }
+    return 1;
+}
+
+static int
+astfold_default(default_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
+{
+    CALL_OPT(astfold_expr, expr_ty, node_->value);
     return 1;
 }
 

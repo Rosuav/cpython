@@ -306,6 +306,7 @@ Known values:
     Python 3.16a1 3706 (Add INTRINSIC_MATCH_CLASS_ISINSTANCE)
     Python 3.16a1 3707 (GET_AWAITABLE also pushes NULL and None for SEND)
     Python 3.16a1 3708 (GET_ANEXT also pushes NULL and None for SEND)
+    Python 3.17a1 3750 (add QUERY_FAST and QUERY_DEREF)
 
     Python 3.17 will start with 3750
 
@@ -315,7 +316,7 @@ Known values:
 
 */
 
-#define PYC_MAGIC_NUMBER 3708
+#define PYC_MAGIC_NUMBER 3750
 /* This is equivalent to converting PYC_MAGIC_NUMBER to 2 bytes
    (little-endian) and then appending b'\r\n'. */
 #define PYC_MAGIC_NUMBER_TOKEN \

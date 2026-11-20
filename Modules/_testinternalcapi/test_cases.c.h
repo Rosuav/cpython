@@ -11172,6 +11172,43 @@
             DISPATCH();
         }
 
+        TARGET(QUERY_DEREF) {
+            #if _Py_TAIL_CALL_INTERP
+            int opcode = QUERY_DEREF;
+            (void)(opcode);
+            #endif
+            frame->instr_ptr = next_instr;
+            next_instr += 1;
+            INSTRUCTION_STATS(QUERY_DEREF);
+            _PyStackRef is_valid;
+            PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
+            PyObject *value = PyCell_GetRef(cell);
+            is_valid = value != NULL
+            ? PyStackRef_True : PyStackRef_False;
+            stack_pointer[0] = is_valid;
+            stack_pointer += 1;
+            ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
+            DISPATCH();
+        }
+
+        TARGET(QUERY_FAST) {
+            #if _Py_TAIL_CALL_INTERP
+            int opcode = QUERY_FAST;
+            (void)(opcode);
+            #endif
+            frame->instr_ptr = next_instr;
+            next_instr += 1;
+            INSTRUCTION_STATS(QUERY_FAST);
+            _PyStackRef is_valid;
+            _PyStackRef value = GETLOCAL(oparg);
+            is_valid = PyStackRef_IsNull(value)
+            ? PyStackRef_True : PyStackRef_False;
+            stack_pointer[0] = is_valid;
+            stack_pointer += 1;
+            ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
+            DISPATCH();
+        }
+
         TARGET(RAISE_VARARGS) {
             #if _Py_TAIL_CALL_INTERP
             int opcode = RAISE_VARARGS;

@@ -39,6 +39,7 @@ const uint32_t _PyUop_Flags[MAX_UOP_ID+1] = {
     [_CHECK_PERIODIC] = HAS_EVAL_BREAK_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG,
     [_CHECK_PERIODIC_IF_NOT_YIELD_FROM] = HAS_ARG_FLAG | HAS_EVAL_BREAK_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG,
     [_RESUME_CHECK] = HAS_DEOPT_FLAG,
+    [_QUERY_FAST] = HAS_ARG_FLAG | HAS_LOCAL_FLAG,
     [_LOAD_FAST_CHECK] = HAS_ARG_FLAG | HAS_LOCAL_FLAG | HAS_ERROR_FLAG,
     [_LOAD_FAST_0] = HAS_LOCAL_FLAG | HAS_PURE_FLAG,
     [_LOAD_FAST_1] = HAS_LOCAL_FLAG | HAS_PURE_FLAG,
@@ -202,6 +203,7 @@ const uint32_t _PyUop_Flags[MAX_UOP_ID+1] = {
     [_MAKE_CELL] = HAS_ARG_FLAG | HAS_FREE_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG | HAS_ESCAPES_FLAG,
     [_DELETE_DEREF] = HAS_ARG_FLAG | HAS_FREE_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG | HAS_ESCAPES_FLAG,
     [_LOAD_FROM_DICT_OR_DEREF] = HAS_ARG_FLAG | HAS_FREE_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG | HAS_ESCAPES_FLAG,
+    [_QUERY_DEREF] = HAS_ARG_FLAG | HAS_FREE_FLAG,
     [_LOAD_DEREF] = HAS_ARG_FLAG | HAS_FREE_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG,
     [_STORE_DEREF] = HAS_ARG_FLAG | HAS_FREE_FLAG | HAS_ESCAPES_FLAG,
     [_COPY_FREE_VARS] = HAS_ARG_FLAG,
@@ -481,6 +483,15 @@ const _PyUopCachingInfo _PyUop_Caching[MAX_UOP_ID+1] = {
             { 1, 1, _RESUME_CHECK_r11 },
             { 2, 2, _RESUME_CHECK_r22 },
             { 3, 3, _RESUME_CHECK_r33 },
+        },
+    },
+    [_QUERY_FAST] = {
+        .best = { 0, 1, 2, 2 },
+        .entries = {
+            { 1, 0, _QUERY_FAST_r01 },
+            { 2, 1, _QUERY_FAST_r12 },
+            { 3, 2, _QUERY_FAST_r23 },
+            { -1, -1, -1 },
         },
     },
     [_LOAD_FAST_CHECK] = {
@@ -1947,6 +1958,15 @@ const _PyUopCachingInfo _PyUop_Caching[MAX_UOP_ID+1] = {
             { -1, -1, -1 },
             { 1, 1, _LOAD_FROM_DICT_OR_DEREF_r11 },
             { -1, -1, -1 },
+            { -1, -1, -1 },
+        },
+    },
+    [_QUERY_DEREF] = {
+        .best = { 0, 1, 2, 2 },
+        .entries = {
+            { 1, 0, _QUERY_DEREF_r01 },
+            { 2, 1, _QUERY_DEREF_r12 },
+            { 3, 2, _QUERY_DEREF_r23 },
             { -1, -1, -1 },
         },
     },
@@ -3925,6 +3945,9 @@ const uint16_t _PyUop_Uncached[MAX_UOP_REGS_ID+1] = {
     [_RESUME_CHECK_r11] = _RESUME_CHECK,
     [_RESUME_CHECK_r22] = _RESUME_CHECK,
     [_RESUME_CHECK_r33] = _RESUME_CHECK,
+    [_QUERY_FAST_r01] = _QUERY_FAST,
+    [_QUERY_FAST_r12] = _QUERY_FAST,
+    [_QUERY_FAST_r23] = _QUERY_FAST,
     [_LOAD_FAST_CHECK_r01] = _LOAD_FAST_CHECK,
     [_LOAD_FAST_CHECK_r12] = _LOAD_FAST_CHECK,
     [_LOAD_FAST_CHECK_r23] = _LOAD_FAST_CHECK,
@@ -4344,6 +4367,9 @@ const uint16_t _PyUop_Uncached[MAX_UOP_REGS_ID+1] = {
     [_MAKE_CELL_r00] = _MAKE_CELL,
     [_DELETE_DEREF_r00] = _DELETE_DEREF,
     [_LOAD_FROM_DICT_OR_DEREF_r11] = _LOAD_FROM_DICT_OR_DEREF,
+    [_QUERY_DEREF_r01] = _QUERY_DEREF,
+    [_QUERY_DEREF_r12] = _QUERY_DEREF,
+    [_QUERY_DEREF_r23] = _QUERY_DEREF,
     [_LOAD_DEREF_r01] = _LOAD_DEREF,
     [_STORE_DEREF_r10] = _STORE_DEREF,
     [_COPY_FREE_VARS_r00] = _COPY_FREE_VARS,
@@ -5974,6 +6000,14 @@ const char *const _PyOpcode_uop_name[MAX_UOP_REGS_ID+1] = {
     [_PY_FRAME_GENERAL_r01] = "_PY_FRAME_GENERAL_r01",
     [_PY_FRAME_KW] = "_PY_FRAME_KW",
     [_PY_FRAME_KW_r11] = "_PY_FRAME_KW_r11",
+    [_QUERY_DEREF] = "_QUERY_DEREF",
+    [_QUERY_DEREF_r01] = "_QUERY_DEREF_r01",
+    [_QUERY_DEREF_r12] = "_QUERY_DEREF_r12",
+    [_QUERY_DEREF_r23] = "_QUERY_DEREF_r23",
+    [_QUERY_FAST] = "_QUERY_FAST",
+    [_QUERY_FAST_r01] = "_QUERY_FAST_r01",
+    [_QUERY_FAST_r12] = "_QUERY_FAST_r12",
+    [_QUERY_FAST_r23] = "_QUERY_FAST_r23",
     [_RECORD_3OS_GEN_FUNC] = "_RECORD_3OS_GEN_FUNC",
     [_RECORD_4OS] = "_RECORD_4OS",
     [_RECORD_BOUND_METHOD] = "_RECORD_BOUND_METHOD",
@@ -6205,6 +6239,8 @@ int _PyUop_num_popped(int opcode, int oparg)
         case _CHECK_PERIODIC_IF_NOT_YIELD_FROM:
             return 0;
         case _RESUME_CHECK:
+            return 0;
+        case _QUERY_FAST:
             return 0;
         case _LOAD_FAST_CHECK:
             return 0;
@@ -6532,6 +6568,8 @@ int _PyUop_num_popped(int opcode, int oparg)
             return 0;
         case _LOAD_FROM_DICT_OR_DEREF:
             return 1;
+        case _QUERY_DEREF:
+            return 0;
         case _LOAD_DEREF:
             return 0;
         case _STORE_DEREF:

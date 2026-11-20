@@ -47,6 +47,10 @@ struct ast_state {
     PyObject *Del_singleton;
     PyObject *Del_type;
     PyObject *Delete_type;
+    PyObject *DfltExpr_singleton;
+    PyObject *DfltExpr_type;
+    PyObject *DfltValue_singleton;
+    PyObject *DfltValue_type;
     PyObject *DictComp_type;
     PyObject *Dict_type;
     PyObject *Div_singleton;
@@ -187,8 +191,10 @@ struct ast_state {
     PyObject *conversion;
     PyObject *ctx;
     PyObject *decorator_list;
+    PyObject *default_type;
     PyObject *default_value;
     PyObject *defaults;
+    PyObject *dflt_style_type;
     PyObject *elt;
     PyObject *elts;
     PyObject *end_col_offset;

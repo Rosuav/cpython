@@ -65,6 +65,10 @@ void _PyAST_Fini(PyInterpreterState *interp)
         offsetof(struct ast_state, Del_singleton),
         offsetof(struct ast_state, Del_type),
         offsetof(struct ast_state, Delete_type),
+        offsetof(struct ast_state, DfltExpr_singleton),
+        offsetof(struct ast_state, DfltExpr_type),
+        offsetof(struct ast_state, DfltValue_singleton),
+        offsetof(struct ast_state, DfltValue_type),
         offsetof(struct ast_state, DictComp_type),
         offsetof(struct ast_state, Dict_type),
         offsetof(struct ast_state, Div_singleton),
@@ -205,8 +209,10 @@ void _PyAST_Fini(PyInterpreterState *interp)
         offsetof(struct ast_state, conversion),
         offsetof(struct ast_state, ctx),
         offsetof(struct ast_state, decorator_list),
+        offsetof(struct ast_state, default_type),
         offsetof(struct ast_state, default_value),
         offsetof(struct ast_state, defaults),
+        offsetof(struct ast_state, dflt_style_type),
         offsetof(struct ast_state, elt),
         offsetof(struct ast_state, elts),
         offsetof(struct ast_state, end_col_offset),
@@ -393,6 +399,7 @@ GENERATE_ASDL_SEQ_CONSTRUCTOR(comprehension, comprehension_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(excepthandler, excepthandler_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(arguments, arguments_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(arg, arg_ty)
+GENERATE_ASDL_SEQ_CONSTRUCTOR(default, default_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(keyword, keyword_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(alias, alias_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(withitem, withitem_ty)
@@ -726,6 +733,12 @@ static const char * const arg_fields[]={
     "arg",
     "annotation",
     "type_comment",
+};
+static PyObject* ast2obj_dflt_style(struct ast_state *state, dflt_style_ty);
+static PyObject* ast2obj_default(struct ast_state *state, void*);
+static const char * const default_fields[]={
+    "value",
+    "type",
 };
 static PyObject* ast2obj_keyword(struct ast_state *state, void*);
 static const char * const keyword_attributes[] = {
@@ -1166,17 +1179,21 @@ add_ast_annotations(struct ast_state *state)
         {offsetof(struct ast_state, kwonlyargs),
          offsetof(struct ast_state, arg_type), FIELD_SEQUENCE},
         {offsetof(struct ast_state, kw_defaults),
-         offsetof(struct ast_state, expr_type), FIELD_SEQUENCE},
+         offsetof(struct ast_state, default_type), FIELD_SEQUENCE},
         {offsetof(struct ast_state, kwarg),
          offsetof(struct ast_state, arg_type), FIELD_OPTIONAL},
         {offsetof(struct ast_state, defaults),
-         offsetof(struct ast_state, expr_type), FIELD_SEQUENCE},
+         offsetof(struct ast_state, default_type), FIELD_SEQUENCE},
         {offsetof(struct ast_state, arg),
          0, FIELD_BUILTIN},
         {offsetof(struct ast_state, annotation),
          offsetof(struct ast_state, expr_type), FIELD_OPTIONAL},
         {offsetof(struct ast_state, type_comment),
          0, FIELD_OPTIONAL | FIELD_BUILTIN},
+        {offsetof(struct ast_state, value),
+         offsetof(struct ast_state, expr_type), 0},
+        {offsetof(struct ast_state, type),
+         offsetof(struct ast_state, dflt_style_type), 0},
         {offsetof(struct ast_state, arg),
          0, FIELD_OPTIONAL | FIELD_BUILTIN},
         {offsetof(struct ast_state, value),
@@ -1344,22 +1361,25 @@ add_ast_annotations(struct ast_state *state)
         {offsetof(struct ast_state, ExceptHandler_type), 153, 3},
         {offsetof(struct ast_state, arguments_type), 156, 7},
         {offsetof(struct ast_state, arg_type), 163, 3},
-        {offsetof(struct ast_state, keyword_type), 166, 2},
-        {offsetof(struct ast_state, alias_type), 168, 2},
-        {offsetof(struct ast_state, withitem_type), 170, 2},
-        {offsetof(struct ast_state, match_case_type), 172, 3},
-        {offsetof(struct ast_state, MatchValue_type), 175, 1},
-        {offsetof(struct ast_state, MatchSingleton_type), 176, 1},
-        {offsetof(struct ast_state, MatchSequence_type), 177, 1},
-        {offsetof(struct ast_state, MatchMapping_type), 178, 3},
-        {offsetof(struct ast_state, MatchClass_type), 181, 4},
-        {offsetof(struct ast_state, MatchStar_type), 185, 1},
-        {offsetof(struct ast_state, MatchAs_type), 186, 2},
-        {offsetof(struct ast_state, MatchOr_type), 188, 1},
-        {offsetof(struct ast_state, TypeIgnore_type), 189, 2},
-        {offsetof(struct ast_state, TypeVar_type), 191, 3},
-        {offsetof(struct ast_state, ParamSpec_type), 194, 2},
-        {offsetof(struct ast_state, TypeVarTuple_type), 196, 2},
+        {offsetof(struct ast_state, DfltValue_type), 166, 0},
+        {offsetof(struct ast_state, DfltExpr_type), 166, 0},
+        {offsetof(struct ast_state, default_type), 166, 2},
+        {offsetof(struct ast_state, keyword_type), 168, 2},
+        {offsetof(struct ast_state, alias_type), 170, 2},
+        {offsetof(struct ast_state, withitem_type), 172, 2},
+        {offsetof(struct ast_state, match_case_type), 174, 3},
+        {offsetof(struct ast_state, MatchValue_type), 177, 1},
+        {offsetof(struct ast_state, MatchSingleton_type), 178, 1},
+        {offsetof(struct ast_state, MatchSequence_type), 179, 1},
+        {offsetof(struct ast_state, MatchMapping_type), 180, 3},
+        {offsetof(struct ast_state, MatchClass_type), 183, 4},
+        {offsetof(struct ast_state, MatchStar_type), 187, 1},
+        {offsetof(struct ast_state, MatchAs_type), 188, 2},
+        {offsetof(struct ast_state, MatchOr_type), 190, 1},
+        {offsetof(struct ast_state, TypeIgnore_type), 191, 2},
+        {offsetof(struct ast_state, TypeVar_type), 193, 3},
+        {offsetof(struct ast_state, ParamSpec_type), 196, 2},
+        {offsetof(struct ast_state, TypeVarTuple_type), 198, 2},
     };
     char *base = (char *)state;
     PyObject *annotations = NULL;
@@ -3025,7 +3045,7 @@ init_types(void *arg)
         return -1;
     state->arguments_type = make_type(state, "arguments", state->AST_type,
                                       arguments_fields, 7,
-        "arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr?* kw_defaults, arg? kwarg, expr* defaults)");
+        "arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, default?* kw_defaults, arg? kwarg, default?* defaults)");
     if (!state->arguments_type) return -1;
     if (add_attributes(state, state->arguments_type, NULL, 0) < 0) return -1;
     if (PyObject_SetAttr(state->arguments_type, state->vararg, Py_None) == -1)
@@ -3045,6 +3065,33 @@ init_types(void *arg)
         return -1;
     if (PyObject_SetAttr(state->arg_type, state->end_col_offset, Py_None) == -1)
         return -1;
+    state->dflt_style_type = make_type(state, "dflt_style", state->AST_type,
+                                       NULL, 0,
+        "dflt_style = DfltValue | DfltExpr");
+    if (!state->dflt_style_type) return -1;
+    if (add_attributes(state, state->dflt_style_type, NULL, 0) < 0) return -1;
+    if (PySet_Add(state->abstract_types, state->dflt_style_type) < 0) return -1;
+    state->DfltValue_type = make_type(state, "DfltValue",
+                                      state->dflt_style_type, NULL, 0,
+        "DfltValue");
+    if (!state->DfltValue_type) return -1;
+    state->DfltValue_singleton = PyType_GenericNew((PyTypeObject
+                                                   *)state->DfltValue_type,
+                                                   NULL, NULL);
+    if (!state->DfltValue_singleton) return -1;
+    state->DfltExpr_type = make_type(state, "DfltExpr", state->dflt_style_type,
+                                     NULL, 0,
+        "DfltExpr");
+    if (!state->DfltExpr_type) return -1;
+    state->DfltExpr_singleton = PyType_GenericNew((PyTypeObject
+                                                  *)state->DfltExpr_type, NULL,
+                                                  NULL);
+    if (!state->DfltExpr_singleton) return -1;
+    state->default_type = make_type(state, "default", state->AST_type,
+                                    default_fields, 2,
+        "default(expr value, dflt_style type)");
+    if (!state->default_type) return -1;
+    if (add_attributes(state, state->default_type, NULL, 0) < 0) return -1;
     state->keyword_type = make_type(state, "keyword", state->AST_type,
                                     keyword_fields, 2,
         "keyword(identifier? arg, expr value)");
@@ -3226,6 +3273,11 @@ static int obj2ast_arguments(struct ast_state *state, PyObject* obj,
                              arena);
 static int obj2ast_arg(struct ast_state *state, PyObject* obj, arg_ty* out,
                        const char* field, PyArena* arena);
+static int obj2ast_dflt_style(struct ast_state *state, PyObject* obj,
+                              dflt_style_ty* out, const char* field, PyArena*
+                              arena);
+static int obj2ast_default(struct ast_state *state, PyObject* obj, default_ty*
+                           out, const char* field, PyArena* arena);
 static int obj2ast_keyword(struct ast_state *state, PyObject* obj, keyword_ty*
                            out, const char* field, PyArena* arena);
 static int obj2ast_alias(struct ast_state *state, PyObject* obj, alias_ty* out,
@@ -4734,9 +4786,9 @@ _PyAST_ExceptHandler(expr_ty type, identifier name, asdl_stmt_seq * body, int
 
 arguments_ty
 _PyAST_arguments(asdl_arg_seq * posonlyargs, asdl_arg_seq * args, arg_ty
-                 vararg, asdl_arg_seq * kwonlyargs, asdl_expr_seq *
-                 kw_defaults, arg_ty kwarg, asdl_expr_seq * defaults, PyArena
-                 *arena)
+                 vararg, asdl_arg_seq * kwonlyargs, asdl_default_seq *
+                 kw_defaults, arg_ty kwarg, asdl_default_seq * defaults,
+                 PyArena *arena)
 {
     arguments_ty p;
     p = (arguments_ty)_PyArena_Malloc(arena, sizeof(*p));
@@ -4772,6 +4824,28 @@ _PyAST_arg(identifier arg, expr_ty annotation, string type_comment, int lineno,
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
     p->end_col_offset = end_col_offset;
+    return p;
+}
+
+default_ty
+_PyAST_default(expr_ty value, dflt_style_ty type, PyArena *arena)
+{
+    default_ty p;
+    if (!value) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'value' is required for default");
+        return NULL;
+    }
+    if (!type) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'type' is required for default");
+        return NULL;
+    }
+    p = (default_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->value = value;
+    p->type = type;
     return p;
 }
 
@@ -6551,7 +6625,7 @@ ast2obj_arguments(struct ast_state *state, void* _o)
     if (PyObject_SetAttr(result, state->kwonlyargs, value) == -1)
         goto failed;
     Py_DECREF(value);
-    value = ast2obj_list(state, (asdl_seq*)o->kw_defaults, ast2obj_expr);
+    value = ast2obj_list(state, (asdl_seq*)o->kw_defaults, ast2obj_default);
     if (!value) goto failed;
     if (PyObject_SetAttr(result, state->kw_defaults, value) == -1)
         goto failed;
@@ -6561,7 +6635,7 @@ ast2obj_arguments(struct ast_state *state, void* _o)
     if (PyObject_SetAttr(result, state->kwarg, value) == -1)
         goto failed;
     Py_DECREF(value);
-    value = ast2obj_list(state, (asdl_seq*)o->defaults, ast2obj_expr);
+    value = ast2obj_list(state, (asdl_seq*)o->defaults, ast2obj_default);
     if (!value) goto failed;
     if (PyObject_SetAttr(result, state->defaults, value) == -1)
         goto failed;
@@ -6623,6 +6697,50 @@ ast2obj_arg(struct ast_state *state, void* _o)
     value = ast2obj_int(state, o->end_col_offset);
     if (!value) goto failed;
     if (PyObject_SetAttr(result, state->end_col_offset, value) < 0)
+        goto failed;
+    Py_DECREF(value);
+    Py_LeaveRecursiveCall();
+    return result;
+failed:
+    Py_LeaveRecursiveCall();
+    Py_XDECREF(value);
+    Py_XDECREF(result);
+    return NULL;
+}
+
+PyObject* ast2obj_dflt_style(struct ast_state *state, dflt_style_ty o)
+{
+    switch(o) {
+        case DfltValue:
+            return Py_NewRef(state->DfltValue_singleton);
+        case DfltExpr:
+            return Py_NewRef(state->DfltExpr_singleton);
+    }
+    Py_UNREACHABLE();
+}
+PyObject*
+ast2obj_default(struct ast_state *state, void* _o)
+{
+    default_ty o = (default_ty)_o;
+    PyObject *result = NULL, *value = NULL;
+    PyTypeObject *tp;
+    if (!o) {
+        Py_RETURN_NONE;
+    }
+    if (Py_EnterRecursiveCall("during  ast construction")) {
+        return NULL;
+    }
+    tp = (PyTypeObject *)state->default_type;
+    result = PyType_GenericNew(tp, NULL, NULL);
+    if (!result) return NULL;
+    value = ast2obj_expr(state, o->value);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->value, value) == -1)
+        goto failed;
+    Py_DECREF(value);
+    value = ast2obj_dflt_style(state, o->type);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->type, value) == -1)
         goto failed;
     Py_DECREF(value);
     Py_LeaveRecursiveCall();
@@ -12617,9 +12735,9 @@ obj2ast_arguments(struct ast_state *state, PyObject* obj, arguments_ty* out,
     asdl_arg_seq* args;
     arg_ty vararg;
     asdl_arg_seq* kwonlyargs;
-    asdl_expr_seq* kw_defaults;
+    asdl_default_seq* kw_defaults;
     arg_ty kwarg;
-    asdl_expr_seq* defaults;
+    asdl_default_seq* defaults;
 
     if (PyObject_GetOptionalAttr(obj, state->posonlyargs, &tmp) < 0) {
         return -1;
@@ -12770,15 +12888,15 @@ obj2ast_arguments(struct ast_state *state, PyObject* obj, arguments_ty* out,
             goto failed;
         }
         len = PyList_GET_SIZE(tmp);
-        kw_defaults = _Py_asdl_expr_seq_new(len, arena);
+        kw_defaults = _Py_asdl_default_seq_new(len, arena);
         if (kw_defaults == NULL) goto failed;
         for (i = 0; i < len; i++) {
-            expr_ty val;
+            default_ty val;
             PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
             if (_Py_EnterRecursiveCall(" while traversing 'arguments' node")) {
                 goto failed;
             }
-            res = obj2ast_expr(state, tmp2, &val, "kw_defaults", arena);
+            res = obj2ast_default(state, tmp2, &val, "kw_defaults", arena);
             _Py_LeaveRecursiveCall();
             Py_DECREF(tmp2);
             if (res != 0) goto failed;
@@ -12825,15 +12943,15 @@ obj2ast_arguments(struct ast_state *state, PyObject* obj, arguments_ty* out,
             goto failed;
         }
         len = PyList_GET_SIZE(tmp);
-        defaults = _Py_asdl_expr_seq_new(len, arena);
+        defaults = _Py_asdl_default_seq_new(len, arena);
         if (defaults == NULL) goto failed;
         for (i = 0; i < len; i++) {
-            expr_ty val;
+            default_ty val;
             PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
             if (_Py_EnterRecursiveCall(" while traversing 'arguments' node")) {
                 goto failed;
             }
-            res = obj2ast_expr(state, tmp2, &val, "defaults", arena);
+            res = obj2ast_default(state, tmp2, &val, "defaults", arena);
             _Py_LeaveRecursiveCall();
             Py_DECREF(tmp2);
             if (res != 0) goto failed;
@@ -12988,6 +13106,83 @@ obj2ast_arg(struct ast_state *state, PyObject* obj, arg_ty* out, const char*
     }
     *out = _PyAST_arg(arg, annotation, type_comment, lineno, col_offset,
                       end_lineno, end_col_offset, arena);
+    if (*out == NULL) goto failed;
+    return 0;
+failed:
+    Py_XDECREF(tmp);
+    return -1;
+}
+
+int
+obj2ast_dflt_style(struct ast_state *state, PyObject* obj, dflt_style_ty* out,
+                   const char* field, PyArena* arena)
+{
+    int isinstance;
+
+    isinstance = PyObject_IsInstance(obj, state->DfltValue_type);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        *out = DfltValue;
+        return 0;
+    }
+    isinstance = PyObject_IsInstance(obj, state->DfltExpr_type);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        *out = DfltExpr;
+        return 0;
+    }
+
+    PyErr_Format(PyExc_TypeError, "expected some sort of dflt_style, but got %R", obj);
+    return -1;
+}
+
+int
+obj2ast_default(struct ast_state *state, PyObject* obj, default_ty* out, const
+                char* field, PyArena* arena)
+{
+    PyObject* tmp = NULL;
+    expr_ty value;
+    dflt_style_ty type;
+
+    if (PyObject_GetOptionalAttr(obj, state->value, &tmp) < 0) {
+        return -1;
+    }
+    if (tmp == NULL) {
+        PyErr_SetString(PyExc_TypeError, "required field \"value\" missing from default");
+        return -1;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'default' node")) {
+            goto failed;
+        }
+        res = obj2ast_expr(state, tmp, &value, "value", arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    if (PyObject_GetOptionalAttr(obj, state->type, &tmp) < 0) {
+        return -1;
+    }
+    if (tmp == NULL) {
+        PyErr_SetString(PyExc_TypeError, "required field \"type\" missing from default");
+        return -1;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'default' node")) {
+            goto failed;
+        }
+        res = obj2ast_dflt_style(state, tmp, &type, "type", arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    *out = _PyAST_default(value, type, arena);
     if (*out == NULL) goto failed;
     return 0;
 failed:
@@ -14689,6 +14884,18 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "arg", state->arg_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "dflt_style", state->dflt_style_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "DfltValue", state->DfltValue_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "DfltExpr", state->DfltExpr_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "default", state->default_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "keyword", state->keyword_type) < 0) {

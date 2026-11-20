@@ -1476,6 +1476,13 @@ iterations of the loop.
    .. versionchanged:: 3.13
       The ``NULL`` is pushed after the global variable, rather than before it.
 
+.. opcode:: QUERY_FAST (var_num)
+
+   Tests whether the local ``co_varnames[var_num]`` has a value, and pushes True or
+   False accordingly. If ``QUERY_FAST`` pushes ``False``, ``LOAD_FAST_CHECK`` would
+   raise ``UnboundLocalError``.
+
+
 .. opcode:: LOAD_FAST (var_num)
 
    Pushes a reference to the local ``co_varnames[var_num]`` onto the stack.
@@ -1603,6 +1610,14 @@ iterations of the loop.
    closures.
 
    .. versionadded:: 3.11
+
+
+.. opcode:: QUERY_DEREF (var_num)
+
+   Tests whether  the cell contained in slot ``i`` of the "fast locals" storage
+   has a value, and pushes True if it does and False if it does not.
+   Consequently, if ``QUERY_DEREF`` pushes ``False``, ``LOAD_DEREF`` would
+   raise ``NameError``.
 
 
 .. opcode:: RAISE_VARARGS (argc)
