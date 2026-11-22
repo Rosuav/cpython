@@ -366,6 +366,8 @@ const size_t _Py_FunctionAttributeOffsets[] = {
     [MAKE_FUNCTION_KWDEFAULTS] = offsetof(PyFunctionObject, func_kwdefaults),
     [MAKE_FUNCTION_DEFAULTS] = offsetof(PyFunctionObject, func_defaults),
     [MAKE_FUNCTION_ANNOTATE] = offsetof(PyFunctionObject, func_annotate),
+    [MAKE_FUNCTION_XDEFAULTS] = offsetof(PyFunctionObject, func_defaults_extra),
+    [MAKE_FUNCTION_XKWDEFAULTS] = offsetof(PyFunctionObject, func_kwdefaults_extra),
 };
 
 // PEP 634: Structural Pattern Matching

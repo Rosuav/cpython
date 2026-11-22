@@ -1029,6 +1029,12 @@ codegen_make_closure(compiler *c, location loc,
     if (flags & MAKE_FUNCTION_DEFAULTS) {
         ADDOP_I(c, loc, SET_FUNCTION_ATTRIBUTE, MAKE_FUNCTION_DEFAULTS);
     }
+    if (flags & MAKE_FUNCTION_XDEFAULTS) {
+        ADDOP_I(c, loc, SET_FUNCTION_ATTRIBUTE, MAKE_FUNCTION_XDEFAULTS);
+    }
+    if (flags & MAKE_FUNCTION_XKWDEFAULTS) {
+        ADDOP_I(c, loc, SET_FUNCTION_ATTRIBUTE, MAKE_FUNCTION_XKWDEFAULTS);
+    }
     return SUCCESS;
 }
 
@@ -1280,7 +1286,7 @@ codegen_default_arguments(compiler *c, location loc,
 		}
 	    }
 	    ADDOP_LOAD_CONST_NEW(c, loc, extra);
-	    funcflags |= 0x10; /* FIXME GIVE THIS A NAME */
+	    funcflags |= MAKE_FUNCTION_XDEFAULTS;
         }
     }
     if (args->kwonlyargs) {
@@ -1292,7 +1298,7 @@ codegen_default_arguments(compiler *c, location loc,
             funcflags |= MAKE_FUNCTION_KWDEFAULTS;
         }
         if (res > 1) {
-            funcflags |= 0x20; /* FIXME GIVE THIS A NAME */
+            funcflags |= MAKE_FUNCTION_XKWDEFAULTS;
         }
     }
     return funcflags;
