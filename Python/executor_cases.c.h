@@ -10777,8 +10777,7 @@
             _PyStackRef is_valid;
             oparg = CURRENT_OPARG();
             PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
-            PyObject *value = PyCell_GetRef(cell);
-            is_valid = value != NULL
+            is_valid = cell->ob_ref != NULL
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache0 = is_valid;
             SET_CURRENT_CACHED_VALUES(1);
@@ -10793,8 +10792,7 @@
             _PyStackRef _stack_item_0 = _tos_cache0;
             oparg = CURRENT_OPARG();
             PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
-            PyObject *value = PyCell_GetRef(cell);
-            is_valid = value != NULL
+            is_valid = cell->ob_ref != NULL
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache1 = is_valid;
             _tos_cache0 = _stack_item_0;
@@ -10811,8 +10809,7 @@
             _PyStackRef _stack_item_1 = _tos_cache1;
             oparg = CURRENT_OPARG();
             PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
-            PyObject *value = PyCell_GetRef(cell);
-            is_valid = value != NULL
+            is_valid = cell->ob_ref != NULL
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache2 = is_valid;
             _tos_cache1 = _stack_item_1;

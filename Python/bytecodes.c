@@ -2404,8 +2404,7 @@ dummy_func(
 
         inst(QUERY_DEREF, (-- is_valid)) {
             PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
-            PyObject *value = PyCell_GetRef(cell); /* FIXME: Is this a new or borrowed ref? */
-            is_valid = value != NULL
+            is_valid = cell->ob_ref != NULL
                 ? PyStackRef_True : PyStackRef_False;
         }
 

@@ -11182,8 +11182,7 @@
             INSTRUCTION_STATS(QUERY_DEREF);
             _PyStackRef is_valid;
             PyCellObject *cell = (PyCellObject *)PyStackRef_AsPyObjectBorrow(GETLOCAL(oparg));
-            PyObject *value = PyCell_GetRef(cell);
-            is_valid = value != NULL
+            is_valid = cell->ob_ref != NULL
             ? PyStackRef_True : PyStackRef_False;
             stack_pointer[0] = is_valid;
             stack_pointer += 1;
