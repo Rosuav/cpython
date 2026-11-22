@@ -277,6 +277,7 @@ static int symtable_visit_alias(struct symtable *st, alias_ty);
 static int symtable_visit_comprehension(struct symtable *st, comprehension_ty);
 static int symtable_visit_keyword(struct symtable *st, keyword_ty);
 static int symtable_visit_params(struct symtable *st, asdl_arg_seq *args);
+static int symtable_visit_default(struct symtable *st, default_ty);
 static int symtable_visit_annotation(struct symtable *st, expr_ty annotation, void *key);
 static int symtable_visit_argannotations(struct symtable *st, asdl_arg_seq *args);
 static int symtable_implicit_arg(struct symtable *st, int pos);
@@ -1832,10 +1833,10 @@ symtable_record_directive(struct symtable *st, identifier name, _Py_SourceLocati
 }
 
 static int
-has_kwonlydefaults(asdl_arg_seq *kwonlyargs, asdl_expr_seq *kw_defaults)
+has_kwonlydefaults(asdl_arg_seq *kwonlyargs, asdl_default_seq *kw_defaults)
 {
     for (int i = 0; i < asdl_seq_LEN(kwonlyargs); i++) {
-        expr_ty default_ = asdl_seq_GET(kw_defaults, i);
+        default_ty default_ = asdl_seq_GET(kw_defaults, i);
         if (default_) {
             return 1;
         }
@@ -1919,9 +1920,9 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL, LOCATION(s)))
             return 0;
         if (s->v.FunctionDef.args->defaults)
-            VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
+            VISIT_SEQ(st, default, s->v.FunctionDef.args->defaults);
         if (s->v.FunctionDef.args->kw_defaults)
-            VISIT_SEQ_WITH_NULL(st, expr, s->v.FunctionDef.args->kw_defaults);
+            VISIT_SEQ_WITH_NULL(st, default, s->v.FunctionDef.args->kw_defaults);
         if (s->v.FunctionDef.decorator_list)
             VISIT_SEQ(st, expr, s->v.FunctionDef.decorator_list);
         if (asdl_seq_LEN(s->v.FunctionDef.type_params) > 0) {
@@ -2303,9 +2304,9 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         if (!symtable_add_def(st, s->v.AsyncFunctionDef.name, DEF_LOCAL, LOCATION(s)))
             return 0;
         if (s->v.AsyncFunctionDef.args->defaults)
-            VISIT_SEQ(st, expr, s->v.AsyncFunctionDef.args->defaults);
+            VISIT_SEQ(st, default, s->v.AsyncFunctionDef.args->defaults);
         if (s->v.AsyncFunctionDef.args->kw_defaults)
-            VISIT_SEQ_WITH_NULL(st, expr,
+            VISIT_SEQ_WITH_NULL(st, default,
                                 s->v.AsyncFunctionDef.args->kw_defaults);
         if (s->v.AsyncFunctionDef.decorator_list)
             VISIT_SEQ(st, expr, s->v.AsyncFunctionDef.decorator_list);
@@ -2524,9 +2525,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         break;
     case Lambda_kind: {
         if (e->v.Lambda.args->defaults)
-            VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);
+            VISIT_SEQ(st, default, e->v.Lambda.args->defaults);
         if (e->v.Lambda.args->kw_defaults)
-            VISIT_SEQ_WITH_NULL(st, expr, e->v.Lambda.args->kw_defaults);
+            VISIT_SEQ_WITH_NULL(st, default, e->v.Lambda.args->kw_defaults);
         if (!symtable_enter_block(st, &_Py_STR(anon_lambda),
                                   FunctionBlock, (void *)e, LOCATION(e))) {
             return 0;
@@ -2869,6 +2870,16 @@ symtable_visit_params(struct symtable *st, asdl_arg_seq *args)
 }
 
 static int
+symtable_visit_default(struct symtable *st, default_ty dflt)
+{
+    //Visit early-bound defaults here; late-bound defaults get visited in
+    //the function's scope.
+    if (dflt->type == DfltValue)
+        VISIT(st, expr, dflt->value);
+    return 1;
+}
+
+static int
 symtable_visit_annotation(struct symtable *st, expr_ty annotation, void *key)
 {
     // Annotations in local scopes are not executed and should not affect the symtable
@@ -3000,6 +3011,22 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
         if (!symtable_add_def(st, a->kwarg->arg, DEF_PARAM, LOCATION(a->kwarg)))
             return 0;
         st->st_cur->ste_varkeywords = 1;
+    }
+    if (a->defaults) {
+        int i = 0;
+        for (i = 0; i < asdl_seq_LEN(a->defaults); i++) {
+            default_ty dflt = (default_ty)asdl_seq_GET(a->defaults, i);
+            if (dflt->type == DfltExpr)
+                VISIT(st, expr, dflt->value);
+        }
+    }
+    if (a->kw_defaults) {
+        int i = 0;
+        for (i = 0; i < asdl_seq_LEN(a->kw_defaults); i++) {
+            default_ty dflt = (default_ty)asdl_seq_GET(a->kw_defaults, i);
+            if (dflt && dflt->type == DfltExpr)
+                VISIT(st, expr, dflt->value);
+        }
     }
     return 1;
 }
