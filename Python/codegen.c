@@ -1061,33 +1061,64 @@ codegen_apply_decorators(compiler *c, asdl_expr_seq* decos)
 
 static int
 codegen_kwonlydefaults(compiler *c, location loc,
-                       asdl_arg_seq *kwonlyargs, asdl_expr_seq *kw_defaults)
+                       asdl_arg_seq *kwonlyargs, asdl_default_seq *kw_defaults)
 {
     /* Push a dict of keyword-only default values.
 
-       Return -1 on error, 0 if no dict pushed, 1 if a dict is pushed.
+       Return -1 on error, 0 if no dict pushed, 1-2 if dict(s) pushed.
        */
     int default_count = 0;
+    PyObject *extras = NULL;
     for (int i = 0; i < asdl_seq_LEN(kwonlyargs); i++) {
         arg_ty arg = asdl_seq_GET(kwonlyargs, i);
-        expr_ty default_ = asdl_seq_GET(kw_defaults, i);
+        default_ty default_ = asdl_seq_GET(kw_defaults, i);
         if (default_) {
             default_count++;
             PyObject *mangled = _PyCompile_MaybeMangle(c, arg->arg);
             if (!mangled) {
-                return ERROR;
+                goto error;
             }
             ADDOP_LOAD_CONST_NEW(c, loc, mangled);
-            VISIT(c, expr, default_);
+            if (default_->type == DfltExpr) {
+                if (!extras) {
+                    extras = PyList_New(0);
+                    if (!extras) goto error;
+                }
+		if (PyList_Append(extras, mangled) == -1) goto error;
+                PyObject *desc = _PyAST_ExprAsUnicode(default_->value);
+		if (!desc) goto error;
+		int res = PyList_Append(extras, desc);
+                Py_DECREF(desc);
+                if (res == -1) goto error;
+                ADDOP_LOAD_CONST(c, loc, Py_Ellipsis); /* If late-bound arg defaults become more common, would it be worth adding Ellipsis to COMMON_CONSTANTS? */
+            } else {
+                VISIT(c, expr, default_->value);
+            }
         }
     }
     if (default_count) {
         ADDOP_I(c, loc, BUILD_MAP, default_count);
+        if (extras) {
+            //What I really want here is to add a frozen dict as a constant.
+            //Instead, we keep the keys and values as a tuple, unpack them,
+            //and then build a dict out of them.
+            Py_ssize_t count = PyList_GET_SIZE(extras);
+            PyObject *extras_tuple = PyList_AsTuple(extras);
+            Py_DECREF(extras);
+            if (!extras_tuple) return ERROR;
+            ADDOP_LOAD_CONST_NEW(c, loc, extras_tuple);
+            ADDOP_I(c, loc, UNPACK_SEQUENCE, count);
+            ADDOP_I(c, loc, BUILD_MAP, count / 2);
+            return 2;
+        }
         return 1;
     }
     else {
         return 0;
     }
+    error:
+    Py_XDECREF(extras);
+    return ERROR;
 }
 
 static int
@@ -1215,23 +1246,42 @@ codegen_function_annotations(compiler *c, location loc,
     return 0;
 }
 
-static int
-codegen_defaults(compiler *c, arguments_ty args,
-                        location loc)
-{
-    VISIT_SEQ(c, expr, args->defaults);
-    ADDOP_I(c, loc, BUILD_TUPLE, asdl_seq_LEN(args->defaults));
-    return SUCCESS;
-}
-
 static Py_ssize_t
 codegen_default_arguments(compiler *c, location loc,
                           arguments_ty args)
 {
     Py_ssize_t funcflags = 0;
     if (args->defaults && asdl_seq_LEN(args->defaults) > 0) {
-        RETURN_IF_ERROR(codegen_defaults(c, args, loc));
+        int i, late = -1;
+        asdl_default_seq *seq = args->defaults;
+        for (i = 0; i < asdl_seq_LEN(seq); i++) {
+            default_ty elt = (default_ty)asdl_seq_GET(seq, i);
+            if (elt->type == DfltExpr) {
+                late = i;
+                ADDOP_LOAD_CONST(c, loc, Py_Ellipsis);
+            } else {
+                VISIT(c, expr, elt->value);
+            }
+        }
+        ADDOP_I(c, loc, BUILD_TUPLE, asdl_seq_LEN(args->defaults));
         funcflags |= MAKE_FUNCTION_DEFAULTS;
+	if (late > -1) {
+	    //There's at least one late-bound default, and the last one is in the given position.
+	    PyObject *extra = PyTuple_New(late + 1);
+	    if (!extra) return ERROR;
+	    for (i = 0; i <= late; i++) {
+		default_ty d = (default_ty)asdl_seq_GET(seq, i);
+		if (d->type == DfltExpr) {
+		    PyObject *desc = _PyAST_ExprAsUnicode(d->value);
+		    PyTuple_SET_ITEM(extra, i, desc);
+		} else {
+		    Py_INCREF(Py_None);
+		    PyTuple_SET_ITEM(extra, i, Py_None);
+		}
+	    }
+	    ADDOP_LOAD_CONST_NEW(c, loc, extra);
+	    funcflags |= 0x10; /* FIXME GIVE THIS A NAME */
+        }
     }
     if (args->kwonlyargs) {
         int res = codegen_kwonlydefaults(c, loc,
@@ -1240,6 +1290,9 @@ codegen_default_arguments(compiler *c, location loc,
         RETURN_IF_ERROR(res);
         if (res > 0) {
             funcflags |= MAKE_FUNCTION_KWDEFAULTS;
+        }
+        if (res > 1) {
+            funcflags |= 0x20; /* FIXME GIVE THIS A NAME */
         }
     }
     return funcflags;
@@ -1433,6 +1486,49 @@ codegen_emit_function_body(compiler *c, asdl_stmt_seq *body)
 }
 
 static int
+codegen_default_arg_expression(compiler *c, Py_ssize_t local, default_ty dflt)
+{
+    if (!dflt || dflt->type != DfltExpr) return SUCCESS;
+    NEW_JUMP_TARGET_LABEL(c, end);
+
+    //How do you figure out whether a given local (by index) is a cell var?
+    //This seems an inefficient technique: get the name, query the name.
+    //CJA 20261123: It also now doesn't work, since it was reaching into compiler internals.
+    //PyObject *name = PyList_GET_ITEM(c->u->u_ste->ste_varnames, local);
+    //int fast = _PyST_GetScope(c->u->u_ste, name) == LOCAL;
+    int fast = 1; //FIXME FIXME Closures referencing args with default expressions won't work
+
+    location loc = LOC(dflt->value);
+    ADDOP_I(c, loc, fast ? QUERY_FAST : QUERY_DEREF, local);
+    ADDOP_JUMP(c, loc, POP_JUMP_IF_TRUE, end);
+    VISIT(c, expr, dflt->value);
+    ADDOP_I(c, loc, fast ? STORE_FAST : STORE_DEREF, local);
+    USE_LABEL(c, end);
+    return SUCCESS;
+}
+
+static int
+codegen_default_arg_expressions(compiler *c, arguments_ty args)
+{
+    Py_ssize_t i;
+    Py_ssize_t argcount = asdl_seq_LEN(args->posonlyargs) + asdl_seq_LEN(args->args);
+    if (args->defaults && asdl_seq_LEN(args->defaults) > 0) {
+        Py_ssize_t mandatory = argcount - asdl_seq_LEN(args->defaults);
+        for (i = 0; i < asdl_seq_LEN(args->defaults); i++) {
+            default_ty dflt = asdl_seq_GET(args->defaults, i);
+            RETURN_IF_ERROR(codegen_default_arg_expression(c, mandatory + i, dflt));
+        }
+    }
+    if (args->kwonlyargs) {
+        for (i = 0; i < asdl_seq_LEN(args->kwonlyargs); i++) {
+            default_ty dflt = asdl_seq_GET(args->kw_defaults, i);
+            RETURN_IF_ERROR(codegen_default_arg_expression(c, argcount + i, dflt));
+        }
+    }
+    return SUCCESS;
+}
+
+static int
 codegen_function_body(compiler *c, stmt_ty s, int is_async, Py_ssize_t funcflags,
                       int firstlineno)
 {
@@ -1467,6 +1563,7 @@ codegen_function_body(compiler *c, stmt_ty s, int is_async, Py_ssize_t funcflags
     RETURN_IF_ERROR(
         codegen_enter_scope(c, name, scope_type, (void *)s, firstlineno, NULL, &umd));
 
+    RETURN_IF_ERROR_IN_SCOPE(c, codegen_default_arg_expressions(c, args));
     RETURN_IF_ERROR_IN_SCOPE(c, codegen_emit_function_body(c, body));
 
     PyCodeObject *co = _PyCompile_OptimizeAndAssemble(c, 1);
@@ -2110,6 +2207,7 @@ codegen_lambda(compiler *c, expr_ty e)
 
     assert(!SYMTABLE_ENTRY(c)->ste_has_docstring);
 
+    RETURN_IF_ERROR_IN_SCOPE(c, codegen_default_arg_expressions(c, args));
     VISIT_IN_SCOPE(c, expr, e->v.Lambda.body);
     if (SYMTABLE_ENTRY(c)->ste_generator) {
         co = _PyCompile_OptimizeAndAssemble(c, 0);
