@@ -1955,6 +1955,14 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
             for (; i < defcount; i++) {
                 if (PyStackRef_AsPyObjectBorrow(localsplus[m+i]) == NULL) {
                     PyObject *def = defs[i];
+                    if (def == Py_Ellipsis && func->func_defaults_extra) {
+                        PyObject *info = NULL;
+                        if (i <= PyTuple_GET_SIZE(func->func_defaults_extra))
+                            info = PyTuple_GET_ITEM(func->func_defaults_extra, i);
+                        if (info && info != Py_None) {
+                            continue;
+                        }
+		    }
                     localsplus[m+i] = PyStackRef_FromPyObjectNew(def);
                 }
             }
@@ -1974,6 +1982,15 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
                     goto fail_post_args;
                 }
                 if (def) {
+                    if (def == Py_Ellipsis && func->func_kwdefaults_extra) {
+                        PyObject *info = NULL;
+                        if (PyDict_GetItemRef(func->func_kwdefaults_extra, varname, &info) < 0) {
+                            goto fail_post_args;
+                        }
+                        if (info && info != Py_None) {
+                            continue;
+                        }
+		    }
                     localsplus[i] = PyStackRef_FromPyObjectSteal(def);
                     continue;
                 }
