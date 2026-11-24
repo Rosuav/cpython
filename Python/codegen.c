@@ -1090,12 +1090,14 @@ codegen_kwonlydefaults(compiler *c, location loc,
                     extras = PyList_New(0);
                     if (!extras) goto error;
                 }
-		if (PyList_Append(extras, mangled) == -1) goto error;
+                /* NOTE: The kwextra dictionary ends up being built in reverse order. Would it be better to
+                insert these at the start of the list instead, or alternatively, to reverse the list after? */
                 PyObject *desc = _PyAST_ExprAsUnicode(default_->value);
 		if (!desc) goto error;
 		int res = PyList_Append(extras, desc);
                 Py_DECREF(desc);
                 if (res == -1) goto error;
+		if (PyList_Append(extras, mangled) == -1) goto error;
                 ADDOP_LOAD_CONST(c, loc, Py_Ellipsis); /* If late-bound arg defaults become more common, would it be worth adding Ellipsis to COMMON_CONSTANTS? */
             } else {
                 VISIT(c, expr, default_->value);
