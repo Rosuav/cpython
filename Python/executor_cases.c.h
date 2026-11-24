@@ -263,7 +263,7 @@
             _PyStackRef is_valid;
             oparg = CURRENT_OPARG();
             _PyStackRef value = GETLOCAL(oparg);
-            is_valid = PyStackRef_IsNull(value)
+            is_valid = !PyStackRef_IsNull(value)
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache0 = is_valid;
             SET_CURRENT_CACHED_VALUES(1);
@@ -278,7 +278,7 @@
             _PyStackRef _stack_item_0 = _tos_cache0;
             oparg = CURRENT_OPARG();
             _PyStackRef value = GETLOCAL(oparg);
-            is_valid = PyStackRef_IsNull(value)
+            is_valid = !PyStackRef_IsNull(value)
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache1 = is_valid;
             _tos_cache0 = _stack_item_0;
@@ -295,7 +295,7 @@
             _PyStackRef _stack_item_1 = _tos_cache1;
             oparg = CURRENT_OPARG();
             _PyStackRef value = GETLOCAL(oparg);
-            is_valid = PyStackRef_IsNull(value)
+            is_valid = !PyStackRef_IsNull(value)
             ? PyStackRef_True : PyStackRef_False;
             _tos_cache2 = is_valid;
             _tos_cache1 = _stack_item_1;

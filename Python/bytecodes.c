@@ -272,7 +272,7 @@ dummy_func(
 
         inst(QUERY_FAST, (-- is_valid)) {
             _PyStackRef value = GETLOCAL(oparg);
-            is_valid = PyStackRef_IsNull(value)
+            is_valid = !PyStackRef_IsNull(value)
                 ? PyStackRef_True : PyStackRef_False;
         }
 

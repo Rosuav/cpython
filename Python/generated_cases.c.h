@@ -11198,7 +11198,7 @@
             INSTRUCTION_STATS(QUERY_FAST);
             _PyStackRef is_valid;
             _PyStackRef value = GETLOCAL(oparg);
-            is_valid = PyStackRef_IsNull(value)
+            is_valid = !PyStackRef_IsNull(value)
             ? PyStackRef_True : PyStackRef_False;
             stack_pointer[0] = is_valid;
             stack_pointer += 1;
