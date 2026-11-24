@@ -2736,7 +2736,7 @@ invalid_parameters_rule(Parser *p)
     return _res;
 }
 
-// invalid_default: '=' &(')' | ',')
+// invalid_default: '=' &(')' | ',') | '=' '>' &(')' | ',')
 Py_LOCAL_SYMBOL void *
 invalid_default_rule(Parser *p)
 {
@@ -2774,6 +2774,35 @@ invalid_default_rule(Parser *p)
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s invalid_default[%d-%d]: %s failed!\n", p->level, ' ',
                   p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'=' &(')' | ',')"));
+    }
+    { // '=' '>' &(')' | ',')
+        if (p->error_indicator) {
+            p->level--;
+            return NULL;
+        }
+        D(fprintf(stderr, "%*c> invalid_default[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'=' '>' &(')' | ',')"));
+        Token * _literal;
+        Token * a;
+        if (
+            (a = _PyPegen_expect_token(p, 22))  // token='='
+            &&
+            (_literal = _PyPegen_expect_token(p, 21))  // token='>'
+            &&
+            _PyPegen_lookahead(1, _tmp_128_rule, p)
+        )
+        {
+            D(fprintf(stderr, "%*c+ invalid_default[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'=' '>' &(')' | ',')"));
+            _res = RAISE_SYNTAX_ERROR_KNOWN_LOCATION ( a , "expected default expression" );
+            if ((_res == NULL || p->error_indicator) && PyErr_Occurred()) {
+                p->error_indicator = 1;
+                p->level--;
+                return NULL;
+            }
+            goto done;
+        }
+        p->mark = _mark;
+        D(fprintf(stderr, "%*c%s invalid_default[%d-%d]: %s failed!\n", p->level, ' ',
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'=' '>' &(')' | ',')"));
     }
     _res = NULL;
   done:

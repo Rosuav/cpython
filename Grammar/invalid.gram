@@ -172,6 +172,7 @@ invalid_parameters:
         RAISE_SYNTAX_ERROR_KNOWN_LOCATION(a, "expected comma between / and *") }
 invalid_default:
     | a='=' &(')'|',') { RAISE_SYNTAX_ERROR_KNOWN_LOCATION(a, "expected default value expression") }
+    | a='=' '>' &(')'|',') { RAISE_SYNTAX_ERROR_KNOWN_LOCATION(a, "expected default expression") }
 invalid_star_etc:
     | a='*' (')' | ',' (')' | '**')) { RAISE_SYNTAX_ERROR_KNOWN_LOCATION(a, "named parameters must follow bare *") }
     | '*' ',' TYPE_COMMENT { RAISE_SYNTAX_ERROR("bare * has associated type comment") }
