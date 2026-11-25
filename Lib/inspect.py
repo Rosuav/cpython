@@ -2301,9 +2301,9 @@ def _signature_fromstr(cls, obj, s, skip_bound_arg=True):
                 value = RewriteSymbolics().visit(default_node.value)
                 if default_node.type is ast.DfltExpr:
                     extra = ast.unparse(value)
-                    o = ...
+                    default = ...
                 else:
-                    o = ast.literal_eval(value)
+                    default = ast.literal_eval(value)
             except ValueError:
                 raise ValueError("{!r} builtin has invalid signature".format(obj)) from None
         parameters.append(Parameter(name, kind, default=default, extra=extra, annotation=empty))
