@@ -1457,8 +1457,9 @@ class TestClassesAndFunctions(unittest.TestCase):
                                     posonlyargs_e=[], kwonlyargs_e=[],
                                     kwonlydefaults_e=None,
                                     ann_e={},
+                                    extra_e=None, kwextra_e=None,
                                     annotation_format=Format.VALUE):
-        args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, ann = \
+        args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, ann, extra, kwextra = \
             inspect.getfullargspec(routine, annotation_format=annotation_format)
         self.assertEqual(args, args_e)
         self.assertEqual(varargs, varargs_e)
@@ -1467,6 +1468,8 @@ class TestClassesAndFunctions(unittest.TestCase):
         self.assertEqual(kwonlyargs, kwonlyargs_e)
         self.assertEqual(kwonlydefaults, kwonlydefaults_e)
         self.assertEqual(ann, ann_e)
+        self.assertEqual(extra, extra_e)
+        self.assertEqual(kwextra, kwextra_e)
 
     def test_getfullargspec(self):
         self.assertFullArgSpecEquals(mod2.keyworded, [], varargs_e='arg1',
@@ -3667,7 +3670,7 @@ class TestSignatureObject(unittest.TestCase):
         class MyParameter(inspect.Parameter):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
-                self.extra = 'spam'
+                self.extraattr = 'spam'
 
         class MySignature(inspect.Signature):
             _parameter_cls = MyParameter
@@ -3679,7 +3682,7 @@ class TestSignatureObject(unittest.TestCase):
         self.assertEqual(len(sig.parameters), 6)
         for param in sig.parameters.values():
             self.assertIs(type(param), MyParameter)
-            self.assertEqual(param.extra, 'spam')
+            self.assertEqual(param.extraattr, 'spam')
         self.assertEqual(sig, inspect.signature(f))
 
     def test_signature_on_method(self):
