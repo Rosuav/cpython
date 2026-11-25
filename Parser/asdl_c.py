@@ -614,6 +614,11 @@ class Obj2ModVisitor(PickleVisitor):
         for a in prod.attributes:
             self.visitFieldDeclaration(a, name, prod=prod, depth=1)
         self.emit("", 0)
+        if name == "default": # HACK: Allow a default to be omitted.
+            self.emit("if (obj == Py_None) {", 1)
+            self.emit("*out = NULL;", 2)
+            self.emit("return 0;", 2)
+            self.emit("}", 1)
         for f in prod.fields:
             self.visitField(f, name, prod=prod, depth=1)
         for a in prod.attributes:

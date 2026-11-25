@@ -13148,6 +13148,10 @@ obj2ast_default(struct ast_state *state, PyObject* obj, default_ty* out, const
     expr_ty value;
     dflt_style_ty type;
 
+    if (obj == Py_None) {
+        *out = NULL;
+        return 0;
+    }
     if (PyObject_GetOptionalAttr(obj, state->value, &tmp) < 0) {
         return -1;
     }
