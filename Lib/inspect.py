@@ -2763,7 +2763,7 @@ class Parameter:
 
     empty = _empty
 
-    def __init__(self, name, kind, *, default=_empty, extra=_empty, annotation=_empty):
+    def __init__(self, name, kind, *, default=_empty, extra=None, annotation=_empty):
         try:
             self._kind = _ParameterKind(kind)
         except ValueError:
@@ -2774,7 +2774,6 @@ class Parameter:
                 msg = msg.format(self._kind.description)
                 raise ValueError(msg)
         self._default = default
-        if extra is _empty: extra = None
         self._extra = extra
         self._annotation = annotation
 
@@ -2809,14 +2808,15 @@ class Parameter:
         self._name = name
 
     @classmethod
-    def _from_code(cls, name, kind, *, default=_empty, annotation=_empty):
+    def _from_code(cls, name, kind, *, default=_empty, extra=None, annotation=_empty):
         # Fast path for Python functions: only the name needs validation.
         if iskeyword(name) or not name.isidentifier():
-            return cls(name, kind, default=default, annotation=annotation)
+            return cls(name, kind, default=default, extra=extra, annotation=annotation)
         self = object.__new__(cls)
         self._name = name
         self._kind = kind
         self._default = default
+        self._extra = extra
         self._annotation = annotation
         return self
 
