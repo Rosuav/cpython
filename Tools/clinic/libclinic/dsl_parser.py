@@ -1059,7 +1059,11 @@ class DSLParser:
             if has_c_default:
                 fail("You can't specify c_default without specifying a default value!")
         else:
+            # If we could assume that this would be run with the current Python, this line would do:
+            # expr = function_args.defaults[0].value
+            # For compatibility with older Pythons, instead we check if we need to unpack.
             expr = function_args.defaults[0]
+            if type(expr).__name__ == "default": expr = expr.value # Not using isinstance in case the class doesn't even exist
             default = ast_input[expr.col_offset: expr.end_col_offset].strip()
 
             if self.parameter_state is ParamState.REQUIRED:
