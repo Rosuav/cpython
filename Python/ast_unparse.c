@@ -252,8 +252,10 @@ append_ast_args(PyUnicodeWriter *writer, arguments_ty args)
 
         di = i - posonlyarg_count - arg_count + default_count;
         if (di >= 0) {
+            default_ty dflt = asdl_seq_GET(args->defaults, di);
             APPEND_CHAR('=');
-            APPEND_EXPR((expr_ty)asdl_seq_GET(args->defaults, di), PR_TEST);
+            if (dflt->type == DfltExpr) APPEND_CHAR('>');
+            APPEND_EXPR(dflt->value, PR_TEST);
         }
         if (posonlyarg_count && i + 1 == posonlyarg_count) {
             APPEND_STR(", /");
@@ -278,10 +280,11 @@ append_ast_args(PyUnicodeWriter *writer, arguments_ty args)
 
         di = i - arg_count + default_count;
         if (di >= 0) {
-            expr_ty default_ = (expr_ty)asdl_seq_GET(args->kw_defaults, di);
+            default_ty default_ = (default_ty)asdl_seq_GET(args->kw_defaults, di);
             if (default_) {
                 APPEND_CHAR('=');
-                APPEND_EXPR(default_, PR_TEST);
+                if (default_->type == DfltExpr) APPEND_CHAR('>');
+                APPEND_EXPR(default_->value, PR_TEST);
             }
         }
     }
