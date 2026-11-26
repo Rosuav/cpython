@@ -491,9 +491,9 @@ class AST_Tests(unittest.TestCase):
             'args': list[ast.arg],
             'vararg': ast.arg | None,
             'kwonlyargs': list[ast.arg],
-            'kw_defaults': list[ast.expr],
+            'kw_defaults': list[ast.default],
             'kwarg': ast.arg | None,
-            'defaults': list[ast.expr],
+            'defaults': list[ast.default],
         })
 
         self.assertEqual(x.args, [])
@@ -1887,14 +1887,14 @@ Module(
 
         check_text(
             "def a(b: int = 0, *, c): ...",
-            empty="Module(body=[FunctionDef(name='a', args=arguments(args=[arg(arg='b', annotation=Name(id='int'))], kwonlyargs=[arg(arg='c')], kw_defaults=[None], defaults=[Constant(value=0)]), body=[Expr(value=Constant(value=Ellipsis))])])",
-            full="Module(body=[FunctionDef(name='a', args=arguments(posonlyargs=[], args=[arg(arg='b', annotation=Name(id='int', ctx=Load()))], kwonlyargs=[arg(arg='c')], kw_defaults=[None], defaults=[Constant(value=0)]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], type_params=[])], type_ignores=[])",
+            empty="Module(body=[FunctionDef(name='a', args=arguments(args=[arg(arg='b', annotation=Name(id='int'))], kwonlyargs=[arg(arg='c')], kw_defaults=[None], defaults=[default(value=Constant(value=0), type=DfltValue())]), body=[Expr(value=Constant(value=Ellipsis))])])",
+            full="Module(body=[FunctionDef(name='a', args=arguments(posonlyargs=[], args=[arg(arg='b', annotation=Name(id='int', ctx=Load()))], kwonlyargs=[arg(arg='c')], kw_defaults=[None], defaults=[default(value=Constant(value=0), type=DfltValue())]), body=[Expr(value=Constant(value=Ellipsis))], decorator_list=[], type_params=[])], type_ignores=[])",
         )
 
         check_text(
             "def a(b: int = 0, *, c): ...",
-            empty="Module(body=[FunctionDef(name='a', args=arguments(args=[arg(arg='b', annotation=Name(id='int', lineno=1, col_offset=9, end_lineno=1, end_col_offset=12), lineno=1, col_offset=6, end_lineno=1, end_col_offset=12)], kwonlyargs=[arg(arg='c', lineno=1, col_offset=21, end_lineno=1, end_col_offset=22)], kw_defaults=[None], defaults=[Constant(value=0, lineno=1, col_offset=15, end_lineno=1, end_col_offset=16)]), body=[Expr(value=Constant(value=Ellipsis, lineno=1, col_offset=25, end_lineno=1, end_col_offset=28), lineno=1, col_offset=25, end_lineno=1, end_col_offset=28)], lineno=1, col_offset=0, end_lineno=1, end_col_offset=28)])",
-            full="Module(body=[FunctionDef(name='a', args=arguments(posonlyargs=[], args=[arg(arg='b', annotation=Name(id='int', ctx=Load(), lineno=1, col_offset=9, end_lineno=1, end_col_offset=12), lineno=1, col_offset=6, end_lineno=1, end_col_offset=12)], kwonlyargs=[arg(arg='c', lineno=1, col_offset=21, end_lineno=1, end_col_offset=22)], kw_defaults=[None], defaults=[Constant(value=0, lineno=1, col_offset=15, end_lineno=1, end_col_offset=16)]), body=[Expr(value=Constant(value=Ellipsis, lineno=1, col_offset=25, end_lineno=1, end_col_offset=28), lineno=1, col_offset=25, end_lineno=1, end_col_offset=28)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=1, end_col_offset=28)], type_ignores=[])",
+            empty="Module(body=[FunctionDef(name='a', args=arguments(args=[arg(arg='b', annotation=Name(id='int', lineno=1, col_offset=9, end_lineno=1, end_col_offset=12), lineno=1, col_offset=6, end_lineno=1, end_col_offset=12)], kwonlyargs=[arg(arg='c', lineno=1, col_offset=21, end_lineno=1, end_col_offset=22)], kw_defaults=[None], defaults=[default(value=Constant(value=0, lineno=1, col_offset=15, end_lineno=1, end_col_offset=16), type=DfltValue())]), body=[Expr(value=Constant(value=Ellipsis, lineno=1, col_offset=25, end_lineno=1, end_col_offset=28), lineno=1, col_offset=25, end_lineno=1, end_col_offset=28)], lineno=1, col_offset=0, end_lineno=1, end_col_offset=28)])",
+            full="Module(body=[FunctionDef(name='a', args=arguments(posonlyargs=[], args=[arg(arg='b', annotation=Name(id='int', ctx=Load(), lineno=1, col_offset=9, end_lineno=1, end_col_offset=12), lineno=1, col_offset=6, end_lineno=1, end_col_offset=12)], kwonlyargs=[arg(arg='c', lineno=1, col_offset=21, end_lineno=1, end_col_offset=22)], kw_defaults=[None], defaults=[default(value=Constant(value=0, lineno=1, col_offset=15, end_lineno=1, end_col_offset=16), type=DfltValue())]), body=[Expr(value=Constant(value=Ellipsis, lineno=1, col_offset=25, end_lineno=1, end_col_offset=28), lineno=1, col_offset=25, end_lineno=1, end_col_offset=28)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=1, end_col_offset=28)], type_ignores=[])",
             include_attributes=True,
         )
 
@@ -2272,17 +2272,17 @@ class ASTValidatorTests(unittest.TestCase):
         check(arguments(args=args), "must have Load context")
         check(arguments(posonlyargs=args), "must have Load context")
         check(arguments(kwonlyargs=args), "must have Load context")
-        check(arguments(defaults=[ast.Constant(3)]),
+        check(arguments(defaults=[ast.default(value=ast.Constant(3), type=ast.DfltValue())]),
                        "more positional defaults than args")
-        check(arguments(kw_defaults=[ast.Constant(4)]),
+        check(arguments(kw_defaults=[ast.default(value=ast.Constant(4), type=ast.DfltValue())]),
                        "length of kwonlyargs is not the same as kw_defaults")
         args = [ast.arg("x", ast.Name("x", ast.Load()))]
-        check(arguments(args=args, defaults=[ast.Name("x", ast.Store())]),
+        check(arguments(args=args, defaults=[ast.default(value=ast.Name("x", ast.Store()), type=ast.DfltValue())]),
                        "must have Load context")
         args = [ast.arg("a", ast.Name("x", ast.Load())),
                 ast.arg("b", ast.Name("y", ast.Load()))]
         check(arguments(kwonlyargs=args,
-                          kw_defaults=[None, ast.Name("x", ast.Store())]),
+                          kw_defaults=[None, ast.default(value=ast.Name("x", ast.Store()), type=ast.DfltValue())]),
                           "must have Load context")
 
     def test_funcdef(self):
