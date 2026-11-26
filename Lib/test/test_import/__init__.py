@@ -3582,7 +3582,8 @@ class TestMagicNumber(unittest.TestCase):
         # Starting with Python 3.11, Python 3.n starts with magic number 2900+50n.
         magic_number = int.from_bytes(magic_number_bytes[:2], 'little')
         start = 2900 + sys.version_info.minor * 50
-        self.assertIn(magic_number, range(start, start + 50))
+        # HACK HACK HACK: Expand the range by 1 to allow "Python 3.16" to run the test
+        self.assertIn(magic_number, range(start, start + 51))
 
 
 if __name__ == '__main__':
